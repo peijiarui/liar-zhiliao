@@ -1,132 +1,68 @@
 package org.liar.ai.liarrag.util;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
-import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Optional;
 
 @Slf4j
 @Component
 public class LocalFileStore {
 
-    private static final Duration DEFAULT_TTL = Duration.ofHours(24);
     private static final String FILE_EXT = ".json";
     private static final String SUB_DIR = "memory";
-    private static final String SAFE_CHARS = "[^a-zA-Z0-9._-]";
 
-    private final ObjectMapper objectMapper;
     private final Path storageDir;
-    private final Duration ttl;
 
     public LocalFileStore() {
-        this(Paths.get("data", SUB_DIR), DEFAULT_TTL, createDefaultObjectMapper());
+        this(Paths.get("data", SUB_DIR));
     }
 
-    public LocalFileStore(Path storageDir, Duration ttl, ObjectMapper objectMapper) {
+    public LocalFileStore(Path storageDir) {
         this.storageDir = storageDir;
-        this.ttl = ttl;
-        this.objectMapper = objectMapper != null ? objectMapper : createDefaultObjectMapper();
     }
 
-    private static ObjectMapper createDefaultObjectMapper() {
-        PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
-                .allowIfSubType("dev.langchain4j.data.message.")
-                .allowIfSubType("java.util.")
-                .build();
-
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.activateDefaultTyping(ptv, ObjectMapper.DefaultTyping.NON_FINAL);
-        return mapper;
-    }
-
-    static String safeFileName(String id) {
-        if (id == null || id.isBlank()) {
+    private Path filePath(String memoryId) {
+        if (memoryId == null || memoryId.isBlank()) {
             throw new IllegalArgumentException("memoryId must not be blank");
         }
-        String sanitized = id.replaceAll("[/\\\\]", "_")
-                .replaceAll(SAFE_CHARS, "_");
-        // 防止目录遍历或特殊文件名
-        if (sanitized.equals(".") || sanitized.equals("..")) {
-            sanitized = "unnamed";
-        }
-        return sanitized + FILE_EXT;
+        return storageDir.resolve(memoryId + FILE_EXT);
     }
 
-    private Path filePath(String id) {
-        return storageDir.resolve(safeFileName(id));
-    }
-
-    public <T> void save(String id, T data) {
+    public void save(String memoryId, String content) {
         try {
             ensureDir();
-            Path file = filePath(id);
-            objectMapper.writeValue(file.toFile(), data);
-            log.debug("Saved file: {}", file);
+            Path file = filePath(memoryId);
+            Files.writeString(file, content, StandardCharsets.UTF_8);
+            log.info("Saved file: {}", file);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to save file for id: " + id, e);
+            throw new RuntimeException("Failed to save file for memoryId: " + memoryId, e);
         }
     }
 
-    private Optional<Path> resolveFreshFile(String id) throws IOException {
-        Path file = filePath(id);
-        try {
-            Instant lastModified = Files.getLastModifiedTime(file).toInstant();
-            if (Duration.between(lastModified, Instant.now()).compareTo(ttl) > 0) {
-                Files.deleteIfExists(file);
-                log.debug("Deleted expired file: {}", file);
-                return Optional.empty();
-            }
-        } catch (NoSuchFileException e) {
+    public Optional<String> read(String memoryId) {
+        Path file = filePath(memoryId);
+        if (!Files.exists(file)) {
             return Optional.empty();
         }
-        return Optional.of(file);
-    }
-
-    public <T> Optional<T> read(String id, Class<T> type) {
         try {
-            return resolveFreshFile(id).map(f -> {
-                try {
-                    return objectMapper.readValue(f.toFile(), type);
-                } catch (IOException e) {
-                    throw new RuntimeException("Failed to deserialize file for id: " + id, e);
-                }
-            });
+            return Optional.of(Files.readString(file, StandardCharsets.UTF_8));
         } catch (IOException e) {
-            throw new RuntimeException("Failed to read file for id: " + id, e);
+            throw new RuntimeException("Failed to read file for memoryId: " + memoryId, e);
         }
     }
 
-    public <T> Optional<T> read(String id, TypeReference<T> typeRef) {
+    public void delete(String memoryId) {
         try {
-            return resolveFreshFile(id).map(f -> {
-                try {
-                    return objectMapper.readValue(f.toFile(), typeRef);
-                } catch (IOException e) {
-                    throw new RuntimeException("Failed to deserialize file for id: " + id, e);
-                }
-            });
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to read file for id: " + id, e);
-        }
-    }
-
-    public void delete(String id) {
-        try {
-            Path file = filePath(id);
+            Path file = filePath(memoryId);
             Files.deleteIfExists(file);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to delete file for id: " + id, e);
+            throw new RuntimeException("Failed to delete file for memoryId: " + memoryId, e);
         }
     }
 

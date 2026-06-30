@@ -18,7 +18,7 @@ public class ChatController {
 
     private final ChatService assistant;
 
-    @GetMapping(value = "/chat", produces = "text/html;charset=utf-8")
+    @GetMapping(produces = "text/html;charset=utf-8")
     public Flux<String> chat(String memoryId, String message) {
         return assistant.chat(memoryId, message);
     }
