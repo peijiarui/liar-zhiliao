@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -56,7 +57,7 @@ public class LocalFileStore {
         String sanitized = id.replaceAll("[/\\\\]", "_")
                 .replaceAll(SAFE_CHARS, "_");
         // 防止目录遍历或特殊文件名
-        if (sanitized.equals(".") || sanitized.equals("..") || sanitized.isBlank()) {
+        if (sanitized.equals(".") || sanitized.equals("..")) {
             sanitized = "unnamed";
         }
         return sanitized + FILE_EXT;
@@ -64,14 +65,6 @@ public class LocalFileStore {
 
     private Path filePath(String id) {
         return storageDir.resolve(safeFileName(id));
-    }
-
-    private boolean isExpired(Path file) throws IOException {
-        if (!Files.exists(file)) {
-            return false;
-        }
-        Instant lastModified = Files.getLastModifiedTime(file).toInstant();
-        return Duration.between(lastModified, Instant.now()).compareTo(ttl) > 0;
     }
 
     public <T> void save(String id, T data) {
@@ -85,18 +78,30 @@ public class LocalFileStore {
         }
     }
 
-    public <T> Optional<T> read(String id, Class<T> type) {
+    private Optional<Path> resolveFreshFile(String id) throws IOException {
+        Path file = filePath(id);
         try {
-            Path file = filePath(id);
-            if (!Files.exists(file)) {
-                return Optional.empty();
-            }
-            if (isExpired(file)) {
+            Instant lastModified = Files.getLastModifiedTime(file).toInstant();
+            if (Duration.between(lastModified, Instant.now()).compareTo(ttl) > 0) {
                 Files.deleteIfExists(file);
                 log.debug("Deleted expired file: {}", file);
                 return Optional.empty();
             }
-            return Optional.of(objectMapper.readValue(file.toFile(), type));
+        } catch (NoSuchFileException e) {
+            return Optional.empty();
+        }
+        return Optional.of(file);
+    }
+
+    public <T> Optional<T> read(String id, Class<T> type) {
+        try {
+            return resolveFreshFile(id).map(f -> {
+                try {
+                    return objectMapper.readValue(f.toFile(), type);
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to deserialize file for id: " + id, e);
+                }
+            });
         } catch (IOException e) {
             throw new RuntimeException("Failed to read file for id: " + id, e);
         }
@@ -104,16 +109,13 @@ public class LocalFileStore {
 
     public <T> Optional<T> read(String id, TypeReference<T> typeRef) {
         try {
-            Path file = filePath(id);
-            if (!Files.exists(file)) {
-                return Optional.empty();
-            }
-            if (isExpired(file)) {
-                Files.deleteIfExists(file);
-                log.debug("Deleted expired file: {}", file);
-                return Optional.empty();
-            }
-            return Optional.of(objectMapper.readValue(file.toFile(), typeRef));
+            return resolveFreshFile(id).map(f -> {
+                try {
+                    return objectMapper.readValue(f.toFile(), typeRef);
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to deserialize file for id: " + id, e);
+                }
+            });
         } catch (IOException e) {
             throw new RuntimeException("Failed to read file for id: " + id, e);
         }
