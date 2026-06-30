@@ -1,3 +1,23 @@
+server:
+  port: 8080
+
 spring:
   application:
     name: liar-rag
+
+# langchain4j 相关配置
+langchain4j:
+  open-ai:
+    chat-model:
+      base-url: https://api.deepseek.com
+      api-key: ${DEEPSEEK_API_KEY}
+      model-name: deepseek-v4-flash
+      log-requests: true
+      log-responses: true
+    streaming-chat-model:
+      base-url: https://api.deepseek.com
+      api-key: ${DEEPSEEK_API_KEY}
+      model-name: deepseek-v4-flash
+      log-requests: true
+      log-responses: true
+
