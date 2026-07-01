@@ -5,7 +5,7 @@ import dev.langchain4j.data.message.ChatMessageDeserializer;
 import dev.langchain4j.data.message.ChatMessageSerializer;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import lombok.extern.slf4j.Slf4j;
-import org.liar.ai.liarrag.util.LocalFileStore;
+import org.liar.ai.liarrag.utils.LocalFileStore;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
