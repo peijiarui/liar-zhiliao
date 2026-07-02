@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>企业级 RAG 知识库 - 05-存储层设计详解</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow-x: hidden; }
+    :root {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e5e5e7;
+      --border: #d1d1d6;
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #aeaeb2;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --success: #34c759;
+      --warning: #ff9f0a;
+      --error: #ff3b30;
+      --selected-bg: #e8f4fd;
+      --selected-border: #0071e3;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1d1d1f;
+        --bg-secondary: #2d2d2f;
+        --bg-tertiary: #3d3d3f;
+        --border: #424245;
+        --text-primary: #f5f5f7;
+        --text-secondary: #86868b;
+        --text-tertiary: #636366;
+        --accent: #0a84ff;
+        --accent-hover: #409cff;
+        --selected-bg: rgba(10, 132, 255, 0.15);
+        --selected-border: #0a84ff;
+      }
+    }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; padding: 2rem; max-width: 1200px; margin: 0 auto; }
+    h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; }
+    .section { margin-bottom: 2rem; }
+    .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .option { background: var(--bg-secondary); border: 2px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: flex-start; gap: 1rem; }
+    .option .letter { background: var(--bg-tertiary); color: var(--text-secondary); width: 1.75rem; height: 1.75rem; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.85rem; flex-shrink: 0; }
+    .option .content { flex: 1; }
+    .option .content h3 { font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .option .content p { color: var(--text-secondary); font-size: 0.85rem; margin: 0; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .card-body { padding: 1rem; }
+    .card-body h3 { margin-bottom: 0.25rem; }
+    .card-body p { color: var(--text-secondary); font-size: 0.85rem; }
+    .mockup { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 1.5rem; }
+    .mockup-header { background: var(--bg-tertiary); padding: 0.5rem 1rem; font-size: 0.75rem; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+    .mockup-body { padding: 1.5rem; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+    .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .pros, .cons { background: var(--bg-secondary); border-radius: 8px; padding: 1rem; }
+    .pros h4 { color: var(--success); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .cons h4 { color: var(--error); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .pros ul, .cons ul { margin-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); }
+    .pros li, .cons li { margin-bottom: 0.25rem; }
+    .placeholder { background: var(--bg-tertiary); border: 2px dashed var(--border); border-radius: 8px; padding: 2rem; text-align: center; color: var(--text-tertiary); }
+    table { border-collapse: collapse; }
+    th, td { padding: 8px 12px; text-align: left; }
+    pre { background: var(--bg-tertiary); color: var(--text-primary); border-radius: 8px; padding: 16px; overflow-x: auto; font-size: 12px; line-height: 1.6; }
+    code { background: var(--bg-tertiary); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+    hr { margin: 24px 0; border: none; border-top: 1px solid var(--border); }
+    ol, ul { padding-left: 20px; }
+    li { line-height: 1.8; }
+  </style>
+</head>
+<body>
+<h2>存储层设计详解</h2>
+<p class="subtitle">会话记忆 · 向量数据 · 业务数据 · 文档文件 · 五种存储各司其职</p>
+
+<div class="section">
+  <h3>一、会话记忆存储 — Redis Stack</h3>
+  <div class="pros-cons">
+    <div class="pros"><h4>为什么选 Redis？</h4>
+    <ul>
+      <li>ChatMemory 每次对话都要读写，读写延迟必须 &lt; 1ms</li>
+      <li>记忆窗口天然是 LRU 淘汰模式，Redis TTL + 内存淘汰完美匹配</li>
+      <li>Redis Stack 内置 JSON 存储，ChatMessage 序列化/反序列化零成本</li>
+      <li>支持 Redis Sentinel / Cluster 实现高可用</li>
+    </ul></div>
+    <div class="cons"><h4>备选方案及对比</h4>
+    <ul>
+      <li><strong>PostgreSQL</strong> — 磁盘 IO 太高，会话聊天不适合频繁写表</li>
+      <li><strong>本地内存</strong> — 服务重启丢失、无法水平扩展（你别用）</li>
+      <li><strong>MongoDB</strong> — 可以但 Redis 更快，且 Redis 还能兼顾缓存/限流</li>
+    </ul></div>
+  </div>
+
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:12px">
+    <h4>LangChain4j 集成方式</h4>
+    <pre style="font-size:12px;line-height:1.6;color:var(--text-primary)">
+// 只需实现 ChatMemoryStore 接口，注入 Redis
+@Bean
+public ChatMemoryStore chatMemoryStore(RedisTemplate<String, String> redis) {
+    return new RedisChatMemoryStore(redis);  // 替代你当前的 CustomChatMemoryStore
+}
+// LangChain4j 自动处理序列化，你现有代码改动 &lt; 10 行</pre>
+  </div>
+</div>
+
+<div class="section">
+  <h3>二、向量存储 — Milvus Standalone</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color)">
+        <tr style="background:var(--bg-secondary)"><td style="padding:8px 12px">部署模式</td><td style="padding:8px 12px">Milvus Standalone</td></tr>
+        <tr><td style="padding:8px 12px">Embedding 维度</td><td style="padding:8px 12px">1024-1536（取决于模型）</td></tr>
+        <tr style="background:var(--bg-secondary)"><td style="padding:8px 12px">索引类型</td><td style="padding:8px 12px">IVF_FLAT → HNSW（生产）</td></tr>
+        <tr><td style="padding:8px 12px">相似度度量</td><td style="padding:8px 12px">Cosine Similarity</td></tr>
+        <tr style="background:var(--bg-secondary)"><td style="padding:8px 12px">分区策略</td><td style="padding:8px 12px">按 knowledgeBaseId 分区（多租户）</td></tr>
+      </table>
+    </div>
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:16px">
+      <h4 style="color:var(--accent)">为什么不用 pgvector？</h4>
+      <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6">
+        pgvector 适合小规模（&lt;100 万向量）且不想引入额外组件的场景。<br><br>
+        但 3000 人企业级知识库，文档可能达百万级，pgvector 索引性能会明显下降。<br><br>
+        Milvus 专为向量检索设计，10 亿级规模、混合检索、GPU 加速。<br>
+        <strong>建议：pgvector 用于开发/测试环境，生产用 Milvus。</strong>
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>三、Elasticsearch — 关键词检索 </h3>
+  <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:12px">
+    与 Milvus 形成混合检索（Hybrid Search）。BM25 算法对专业术语、编号、日期等精确匹配远优于向量检索。
+  </p>
+  <div style="display:flex;gap:12px">
+    <span style="background:var(--bg-tertiary);padding:4px 12px;border-radius:6px;font-size:12px">倒排索引</span>
+    <span style="background:var(--bg-tertiary);padding:4px 12px;border-radius:6px;font-size:12px">全文检索</span>
+    <span style="background:var(--bg-tertiary);padding:4px 12px;border-radius:6px;font-size:12px">高亮片段</span>
+    <span style="background:var(--bg-tertiary);padding:4px 12px;border-radius:6px;font-size:12px">分面搜索</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>四、PostgreSQL — 业务数据主库</h3>
+  <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color)">
+    <tr style="background:var(--bg-secondary)"><td style="padding:8px 12px"><strong>核心表</strong></td><td style="padding:8px 12px">users, departments, knowledge_bases, documents, chunks, conversations, audit_logs</td></tr>
+    <tr><td style="padding:8px 12px"><strong>多租户</strong></td><td style="padding:8px 12px">所有表带 tenant_id / dept_id，基于 Row-Level Security 或应用层过滤</td></tr>
+    <tr style="background:var(--bg-secondary)"><td style="padding:8px 12px"><strong>扩展</strong></td><td style="padding:8px 12px">pg_trgm（模糊搜索）、pgvector（开发环境向量检索）</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <h3>五、MinIO — 原始文档对象存储</h3>
+  <p style="font-size:0.9rem;color:var(--text-secondary)">
+    S3 兼容 API，存放上传的原始文档（PDF/Word/图片等）。文档处理后，原始文件保留以供溯源和重新处理。
+    公司内部可部署 MinIO Server 替代 AWS S3，成本为零。
+  </p>
+</div>
+
+<div class="section">
+  <h3>六、RabbitMQ — 异步任务</h3>
+  <p style="font-size:0.9rem;color:var(--text-secondary)">
+    大文档（>50MB 的 PDF）解析耗时，通过消息队列异步处理，避免阻塞 HTTP 请求。也用于批量导入任务的解耦。
+  </p>
+</div>
+</body>
+</html>

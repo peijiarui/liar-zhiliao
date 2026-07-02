@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>企业级 RAG 知识库 - 07-技术选型QA</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow-x: hidden; }
+    :root {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e5e5e7;
+      --border: #d1d1d6;
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #aeaeb2;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --success: #34c759;
+      --warning: #ff9f0a;
+      --error: #ff3b30;
+      --selected-bg: #e8f4fd;
+      --selected-border: #0071e3;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1d1d1f;
+        --bg-secondary: #2d2d2f;
+        --bg-tertiary: #3d3d3f;
+        --border: #424245;
+        --text-primary: #f5f5f7;
+        --text-secondary: #86868b;
+        --text-tertiary: #636366;
+        --accent: #0a84ff;
+        --accent-hover: #409cff;
+        --selected-bg: rgba(10, 132, 255, 0.15);
+        --selected-border: #0a84ff;
+      }
+    }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; padding: 2rem; max-width: 1200px; margin: 0 auto; }
+    h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; }
+    .section { margin-bottom: 2rem; }
+    .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .option { background: var(--bg-secondary); border: 2px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: flex-start; gap: 1rem; }
+    .option .letter { background: var(--bg-tertiary); color: var(--text-secondary); width: 1.75rem; height: 1.75rem; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.85rem; flex-shrink: 0; }
+    .option .content { flex: 1; }
+    .option .content h3 { font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .option .content p { color: var(--text-secondary); font-size: 0.85rem; margin: 0; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .card-body { padding: 1rem; }
+    .card-body h3 { margin-bottom: 0.25rem; }
+    .card-body p { color: var(--text-secondary); font-size: 0.85rem; }
+    .mockup { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 1.5rem; }
+    .mockup-header { background: var(--bg-tertiary); padding: 0.5rem 1rem; font-size: 0.75rem; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+    .mockup-body { padding: 1.5rem; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+    .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .pros, .cons { background: var(--bg-secondary); border-radius: 8px; padding: 1rem; }
+    .pros h4 { color: var(--success); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .cons h4 { color: var(--error); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .pros ul, .cons ul { margin-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); }
+    .pros li, .cons li { margin-bottom: 0.25rem; }
+    .placeholder { background: var(--bg-tertiary); border: 2px dashed var(--border); border-radius: 8px; padding: 2rem; text-align: center; color: var(--text-tertiary); }
+    table { border-collapse: collapse; }
+    th, td { padding: 8px 12px; text-align: left; }
+    pre { background: var(--bg-tertiary); color: var(--text-primary); border-radius: 8px; padding: 16px; overflow-x: auto; font-size: 12px; line-height: 1.6; }
+    code { background: var(--bg-tertiary); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+    hr { margin: 24px 0; border: none; border-top: 1px solid var(--border); }
+    ol, ul { padding-left: 20px; }
+    li { line-height: 1.8; }
+  </style>
+</head>
+<body>
+<h2>技术选型 Q&A</h2>
+<p class="subtitle">9 个关键技术决策的深度对比与解答</p>
+
+<!-- Q1 -->
+<div class="section">
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="color:var(--accent)">Q1：会话记忆用 Redis 会丢失吗？为什么不用 MySQL？</h3>
+
+    <div class="split" style="margin-top:12px">
+      <div>
+        <h4 style="color:var(--success)">Redis 方案（推荐）</h4>
+        <ul style="font-size:0.85rem;color:var(--text-secondary);line-height:1.8">
+          <li><strong>RDB 快照 + AOF 日志双重持久化</strong>，不会丢数据</li>
+          <li>配置：<code>save 60 1000</code>（60秒内1000次写入触发快照）+ <code>appendonly yes</code></li>
+          <li>极端情况（机房断电）最多丢失最后 1 秒的 AOF 数据</li>
+          <li>Redis Sentinel / Cluster 实现高可用自动故障转移</li>
+        </ul>
+      </div>
+      <div>
+        <h4 style="color:var(--error)">MySQL 的问题</h4>
+        <ul style="font-size:0.85rem;color:var(--text-secondary);line-height:1.8">
+          <li>每次对话都写表 → IO 密集，磁盘延迟 5-10ms</li>
+          <li>对话消失被海量读写（用户每说一句就触发 updateMessages）</li>
+          <li>20 条消息窗口 = 频繁 UPDATE，MySQL 行锁竞争</li>
+          <li><strong>ChatMemory 不是"持久数据"</strong>——它是短期上下文窗口，丢了不影响业务，Redis 的定位天然匹配</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="background:var(--selected-bg);border-radius:8px;padding:12px;margin-top:12px">
+      <p style="font-size:0.85rem;margin:0"><strong>结论：</strong>ChatMemory 的读写模式是"高频读写 + 短期窗口 + 允许丢失"，这恰好是 Redis 的强项。如果实在不放心，可以 Redis + MySQL 双写（Redis 读，MySQL 冷备），但 3000 人企业场景下完全没必要。</p>
+    </div>
+  </div>
+</div>
+
+<!-- Q2 -->
+<div class="section">
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="color:var(--accent)">Q2：Redis Stack 也支持向量检索，为什么还要 Milvus？</h3>
+
+    <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color);margin-top:12px">
+      <tr style="background:var(--bg-secondary)">
+        <th style="padding:10px 16px;text-align:left;border-bottom:1px solid var(--border)">对比维度</th>
+        <th style="padding:10px 16px;text-align:left;border-bottom:1px solid var(--border)">Redis Stack (向量)</th>
+        <th style="padding:10px 16px;text-align:left;border-bottom:1px solid var(--border)">Milvus Standalone</th>
+      </tr>
+      <tr>
+        <td style="padding:10px 16px"><strong>定位</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem">缓存 + 轻量向量检索</td>
+        <td style="padding:10px 16px;font-size:0.85rem">专业向量数据库</td>
+      </tr>
+      <tr style="background:var(--bg-secondary)">
+        <td style="padding:10px 16px"><strong>索引算法</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem">FLAT / HNSW</td>
+        <td style="padding:10px 16px;font-size:0.85rem">HNSW / IVF_FLAT / IVF_PQ / SCANN / DiskANN 等 11 种</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 16px"><strong>向量规模</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem">&lt; 100 万（受内存限制）</td>
+        <td style="padding:10px 16px;font-size:0.85rem">10 亿+（内存+磁盘混合）</td>
+      </tr>
+      <tr style="background:var(--bg-secondary)">
+        <td style="padding:10px 16px"><strong>混合检索</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem">支持但能力有限</td>
+        <td style="padding:10px 16px;font-size:0.85rem">原生混合检索（稠密+稀疏+标量过滤）</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 16px"><strong>分区/多租户</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem">需手动管理 key 前缀</td>
+        <td style="padding:10px 16px;font-size:0.85rem">原生 Partition Key，自动路由</td>
+      </tr>
+      <tr style="background:var(--bg-secondary)">
+        <td style="padding:10px 16px"><strong>召回精度</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem">一般</td>
+        <td style="padding:10px 16px;font-size:0.85rem">高（支持 IVF_PQ 等压缩索引仍保持高召回）</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 16px"><strong>内存成本</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem;color:var(--error)">极高！全内存存储，100万条1024维 ≈ 4GB+ 内存</td>
+        <td style="padding:10px 16px;font-size:0.85rem;color:var(--success)">低！内存+磁盘混合，热数据在内存，冷数据在磁盘</td>
+      </tr>
+      <tr style="background:var(--bg-secondary)">
+        <td style="padding:10px 16px"><strong>适用场景</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem">小规模缓存、实时推荐</td>
+        <td style="padding:10px 16px;font-size:0.85rem">企业级知识库、语义搜索</td>
+      </tr>
+    </table>
+
+    <div style="background:var(--selected-bg);border-radius:8px;padding:12px;margin-top:12px">
+      <p style="font-size:0.85rem;margin:0"><strong>结论：</strong>Redis 的向量是"锦上添花"的附加功能，不是立身之本。知识库场景下，内存成本是关键——100 万文档 Chunk 占用 4GB+ 内存放 Redis，而 Milvus 仅需几百 MB。同时 Milvus 的索引算法、多租户分区、混合检索能力都碾压 Redis Stack。</p>
+    </div>
+  </div>
+</div>
+
+<!-- Q3 -->
+<div class="section">
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="color:var(--accent)">Q3：BGE-M3 本地部署是向量模型吗？为什么不自调第三方 API？</h3>
+
+    <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6">
+      <strong>是的，BGE-M3 是 Embedding 模型</strong>（文本→向量）。它由北京智源研究院 (BAAI) 开源，HuggingFace 上可直接下载。
+    </p>
+
+    <div class="split" style="margin-top:12px">
+      <div>
+        <h4 style="color:var(--success)">本地部署的优点</h4>
+        <ul style="font-size:0.85rem;color:var(--text-secondary);line-height:1.8">
+          <li><strong>数据不出内网</strong>——企业文档不经过第三方 API</li>
+          <li><strong>零调用成本</strong>——无 API 按量计费</li>
+          <li><strong>低延迟</strong>——内网调用 &lt; 50ms，第三方 API 50-500ms</li>
+          <li><strong>BGE-M3 特点：</strong>中英双语、1024维、同时输出稠密+稀疏向量（天然支持混合检索）</li>
+        </ul>
+      </div>
+      <div>
+        <h4 style="color:var(--warning)">第三方 Embedding API 推荐</h4>
+        <ul style="font-size:0.85rem;color:var(--text-secondary);line-height:1.8">
+          <li><strong>通义千问 text-embedding-v3</strong> — 中文效果最好，1024/768维可选</li>
+          <li><strong>OpenAI text-embedding-3-large</strong> — 中英文通用，3072维</li>
+          <li><strong>DeepSeek Embedding</strong> — 性价比高，适合已有 DeepSeek 用户</li>
+          <li><strong>Cohere Embed v3</strong> — 多语言，企业级 SLA</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="background:var(--selected-bg);border-radius:8px;padding:12px;margin-top:12px">
+      <p style="font-size:0.85rem;margin:0"><strong>建议：</strong>MVP 阶段可先用 DeepSeek Embedding API（你已有 API Key），快速跑通。生产环境迁移到 BGE-M3 本地部署。两者 LangChain4j 切换只需改 Bean 配置，零业务代码变更。</p>
+    </div>
+  </div>
+</div>
+
+<!-- Q4 -->
+<div class="section">
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="color:var(--accent)">Q4：业务数据库为什么用 PostgreSQL 而不是 MySQL？</h3>
+
+    <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color);margin-top:12px">
+      <tr style="background:var(--bg-secondary)">
+        <th style="padding:10px 16px;text-align:left;border-bottom:1px solid var(--border)">特性</th>
+        <th style="padding:10px 16px;text-align:left;border-bottom:1px solid var(--border)">PostgreSQL 16</th>
+        <th style="padding:10px 16px;text-align:left;border-bottom:1px solid var(--border)">MySQL 8.0</th>
+      </tr>
+      <tr>
+        <td style="padding:10px 16px"><strong>JSON 支持</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem;color:var(--success)">JSONB — 二进制存储，支持索引，查询极快</td>
+        <td style="padding:10px 16px;font-size:0.85rem">JSON — 文本存储，性能差一个数量级</td>
+      </tr>
+      <tr style="background:var(--bg-secondary)">
+        <td style="padding:10px 16px"><strong>全文搜索</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem;color:var(--success)">内置 tsvector + 中文分词（zhparser）</td>
+        <td style="padding:10px 16px;font-size:0.85rem">ngram 分词，中文效果差</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 16px"><strong>向量扩展</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem;color:var(--success)">pgvector — 直接支持向量检索</td>
+        <td style="padding:10px 16px;font-size:0.85rem">无原生支持</td>
+      </tr>
+      <tr style="background:var(--bg-secondary)">
+        <td style="padding:10px 16px"><strong>并发模型</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem;color:var(--success)">MVCC — 读写互不阻塞</td>
+        <td style="padding:10px 16px;font-size:0.85rem">MVCC + Undo Log，高并发下略逊</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 16px"><strong>分析能力</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem;color:var(--success)">窗口函数、CTE、递归查询</td>
+        <td style="padding:10px 16px;font-size:0.85rem">窗口函数支持较晚</td>
+      </tr>
+      <tr style="background:var(--bg-secondary)">
+        <td style="padding:10px 16px"><strong>许可协议</strong></td>
+        <td style="padding:10px 16px;font-size:0.85rem">完全开源 (PostgreSQL License)</td>
+        <td style="padding:10px 16px;font-size:0.85rem">Oracle 所有，存在合规风险</td>
+      </tr>
+    </table>
+
+    <div style="background:var(--selected-bg);border-radius:8px;padding:12px;margin-top:12px">
+      <p style="font-size:0.85rem;margin:0"><strong>核心原因：pgvector。</strong>知识库的文档元数据、Chunk 内容本身就存在 PG 里，pgvector 可以直接在同一张表上做向量检索，开发环境甚至不需要单独部署 Milvus。一条 SQL 搞定"查询标题包含'请假'的文档 AND 内容向量相似度 > 0.8"。MySQL 做不到。</p>
+    </div>
+  </div>
+</div>
+
+<!-- Q5 -->
+<div class="section">
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="color:var(--accent)">Q5：消息队列做什么？为什么 RabbitMQ 而不是 RocketMQ？</h3>
+
+    <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6">
+      <strong>消息队列在企业知识库中的三大用途：</strong>
+    </p>
+    <ol style="font-size:0.85rem;color:var(--text-secondary);line-height:2;padding-left:20px">
+      <li><strong>文档异步处理</strong>——上传 50MB PDF 后立即返回"处理中"，Worker 异步解析+向量化+写入索引，处理完通知用户</li>
+      <li><strong>批量导入</strong>——从 Wiki 同步 1000 篇文档时，逐条投递到队列，多 Worker 并行消费，控制速率避免打爆 LLM API</li>
+      <li><strong>事件通知</strong>——文档索引完成、知识库更新等事件，通知下游服务（如 WebSocket 推送前端刷新）</li>
+    </ol>
+
+    <div class="split" style="margin-top:12px">
+      <div>
+        <h4 style="color:var(--success)">选 RabbitMQ 的理由</h4>
+        <ul style="font-size:0.85rem;color:var(--text-secondary);line-height:1.8">
+          <li><strong>Spring 原生集成</strong>——spring-amqp 开箱即用，配置量极低</li>
+          <li><strong>功能刚好够</strong>——ACK 确认、死信队列、延迟消息、优先级队列</li>
+          <li><strong>运维简单</strong>——Docker 一键部署，管理界面直观</li>
+          <li><strong>社区成熟</strong>——文档/案例丰富，问题好排查</li>
+        </ul>
+      </div>
+      <div>
+        <h4 style="color:var(--warning)">RocketMQ 更合适的情况</h4>
+        <ul style="font-size:0.85rem;color:var(--text-secondary);line-height:1.8">
+          <li>十万级 TPS 的高吞吐场景（如电商交易）</li>
+          <li>需要事务消息（分布式事务）</li>
+          <li>团队对阿里技术栈更熟悉</li>
+          <li>已在用阿里云，RocketMQ 托管服务更省心</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="background:var(--selected-bg);border-radius:8px;padding:12px;margin-top:12px">
+      <p style="font-size:0.85rem;margin:0"><strong>结论：</strong>3000 人内部知识库，日均处理文档不过百篇，RabbitMQ 的吞吐完全够用。Spring 集成度和运维简单性是决定性因素。<strong>如果公司已经在用 RocketMQ，优先复用现有基础设施。</strong></p>
+    </div>
+  </div>
+</div>
+
+<!-- Q6 -->
+<div class="section">
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="color:var(--accent)">Q6：MinIO 怎么使用？（含伪代码）</h3>
+
+    <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6">
+      MinIO 是自建的对象存储服务，兼容 AWS S3 协议。通俗理解：你公司内部的"私有 AWS S3"。Docker 一行命令启动。Spring Boot 通过 S3 SDK 操作文件。
+    </p>
+
+    <div style="background:#1d1d1f;border-radius:8px;padding:16px;margin-top:12px;overflow-x:auto">
+      <pre style="font-size:12px;line-height:1.6;color:#34c759;margin:0">
+<span style="color:#86868b">// ===== 1. Docker 启动 MinIO =====</span>
+<span style="color:#86868b">// docker run -p 9000:9000 -p 9001:9001 \</span>
+<span style="color:#86868b">//   -e MINIO_ROOT_USER=admin -e MINIO_ROOT_PASSWORD=admin123 \</span>
+<span style="color:#86868b">//   minio/minio server /data --console-address ":9001"</span>
+
+<span style="color:#86868b">// ===== 2. Maven 依赖 =====</span>
+<span style="color:#86868b">// io.minio:minio:8.5.7</span>
+
+<span style="color:#86868b">// ===== 3. 上传文档 =====</span>
+<span style="color:#ff9f0a">@Service</span>
+<span style="color:#ff9f0a">public class</span> <span style="color:#0a84ff">DocumentStorageService</span> {
+
+    <span style="color:#ff9f0a">@Autowired</span>
+    <span style="color:#ff9f0a">private</span> MinioClient minioClient;  <span style="color:#86868b">// Bean: MinioClient.builder()</span>
+                                          <span style="color:#86868b">//   .endpoint("http://192.168.1.100:9000")</span>
+                                          <span style="color:#86868b">//   .credentials("admin","admin123").build()</span>
+
+    <span style="color:#86868b">// 上传文档</span>
+    <span style="color:#ff9f0a">public</span> String <span style="color:#0a84ff">uploadDocument</span>(MultipartFile file, String deptId) {
+        String objectKey = deptId + <span style="color:#34c759">"/"</span> + UUID.randomUUID()
+                         + <span style="color:#34c759">"/"</span> + file.getOriginalFilename();
+
+        minioClient.putObject(PutObjectArgs.builder()
+            .bucket(<span style="color:#34c759">"knowledge-base"</span>)      <span style="color:#86868b">// bucket = 命名空间</span>
+            .object(objectKey)              <span style="color:#86868b">// deptId/uuid/filename.pdf</span>
+            .stream(file.getInputStream(), file.getSize(), -1)
+            .contentType(file.getContentType())
+            .build());
+
+        <span style="color:#ff9f0a">return</span> objectKey;  <span style="color:#86868b">// 存到 PG 的 documents 表</span>
+    }
+
+    <span style="color:#86868b">// 下载文档（用于溯源：用户点击引用链接时返回原始文件）</span>
+    <span style="color:#ff9f0a">public</span> InputStream <span style="color:#0a84ff">downloadDocument</span>(String objectKey) {
+        <span style="color:#ff9f0a">return</span> minioClient.getObject(GetObjectArgs.builder()
+            .bucket(<span style="color:#34c759">"knowledge-base"</span>)
+            .object(objectKey)
+            .build());
+    }
+
+    <span style="color:#86868b">// 生成预签名 URL（前端直接下载，不经过后端）</span>
+    <span style="color:#ff9f0a">public</span> String <span style="color:#0a84ff">getPresignedUrl</span>(String objectKey) {
+        <span style="color:#ff9f0a">return</span> minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+            .bucket(<span style="color:#34c759">"knowledge-base"</span>)
+            .object(objectKey)
+            .method(Method.GET)
+            .expiry(60)  <span style="color:#86868b">// 60秒过期</span>
+            .build());
+    }
+}</pre>
+    </div>
+
+    <div style="background:var(--selected-bg);border-radius:8px;padding:12px;margin-top:12px">
+      <p style="font-size:0.85rem;margin:0"><strong>流程：</strong>用户上传文档 → 先存 MinIO 拿到 objectKey → 再异步解析/向量化 → objectKey 存入 PG 的 documents 表 → 用户点击"查看原文"时生成预签名 URL 返回前端。</p>
+    </div>
+  </div>
+</div>
+
+<!-- Q7 -->
+<div class="section">
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="color:var(--accent)">Q7：Apache Tika + PDFBox + Tesseract 怎么用？开源吗？</h3>
+
+    <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6">
+      <strong>全部开源（Apache 2.0 License），可以放心商用。</strong>
+    </p>
+
+    <div class="cards" style="margin-top:12px">
+      <div class="card">
+        <div class="card-body">
+          <h3>Apache Tika</h3>
+          <p>通用文档解析引擎，自动检测文件类型并提取文本。支持 PDF/Word/PPT/Excel/HTML 等 1000+ 格式。</p>
+          <span class="label">门面层，统一入口</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <h3>PDFBox</h3>
+          <p>专业 PDF 处理库。当 Tika 对复杂 PDF（多栏、加密、表单）解析不佳时，用 PDFBox 做降级处理。</p>
+          <span class="label">PDF 深度处理</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <h3>Tesseract</h3>
+          <p>Google 开源的 OCR 引擎。当 PDF 是扫描件/图片时，无法直接提取文字，需要 Tesseract 光学识别。</p>
+          <span class="label">OCR 文字识别</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#1d1d1f;border-radius:8px;padding:16px;margin-top:16px;overflow-x:auto">
+      <pre style="font-size:12px;line-height:1.6;color:#34c759;margin:0">
+<span style="color:#86868b">// ===== Maven =====</span>
+<span style="color:#86868b">// org.apache.tika:tika-core:2.9.2</span>
+<span style="color:#86868b">// org.apache.tika:tika-parsers-standard-package:2.9.2</span>
+<span style="color:#86868b">// org.apache.pdfbox:pdfbox:3.0.1</span>
+<span style="color:#86868b">// net.sourceforge.tess4j:tess4j:5.9.0  (Tesseract Java 封装)</span>
+
+<span style="color:#86868b">// ===== 1. Tika 通用解析（覆盖 80% 场景）=====</span>
+<span style="color:#ff9f0a">public</span> String <span style="color:#0a84ff">parseWithTika</span>(InputStream fileStream, String fileName) {
+    Tika tika = <span style="color:#ff9f0a">new</span> Tika();
+    <span style="color:#ff9f0a">return</span> tika.parseToString(fileStream);  <span style="color:#86868b">// 自动检测类型，提取纯文本</span>
+}
+
+<span style="color:#86868b">// ===== 2. PDFBox 深度处理（复杂 PDF）=====</span>
+<span style="color:#ff9f0a">public</span> String <span style="color:#0a84ff">parsePdfWithPDFBox</span>(InputStream fileStream) {
+    PDDocument document = PDDocument.load(fileStream);
+    PDFTextStripper stripper = <span style="color:#ff9f0a">new</span> PDFTextStripper();
+    stripper.setSortByPosition(<span style="color:#ff9f0a">true</span>);  <span style="color:#86868b">// 按页面位置排序，保留阅读顺序</span>
+    <span style="color:#ff9f0a">return</span> stripper.getText(document);
+}
+
+<span style="color:#86868b">// ===== 3. Tesseract OCR（扫描件降级）=====</span>
+<span style="color:#ff9f0a">public</span> String <span style="color:#0a84ff">parseScannedPdfWithOCR</span>(InputStream fileStream) {
+    PDDocument document = PDDocument.load(fileStream);
+    PDFRenderer renderer = <span style="color:#ff9f0a">new</span> PDFRenderer(document);
+    StringBuilder text = <span style="color:#ff9f0a">new</span> StringBuilder();
+    <span style="color:#ff9f0a">for</span> (<span style="color:#ff9f0a">int</span> page = 0; page < document.getNumberOfPages(); page++) {
+        BufferedImage image = renderer.renderImageWithDPI(page, 300);  <span style="color:#86868b">// 300 DPI</span>
+        text.append(tesseract.doOCR(image));  <span style="color:#86868b">// Tesseract OCR</span>
+    }
+    <span style="color:#ff9f0a">return</span> text.toString();
+}
+
+<span style="color:#86868b">// ===== 4. 策略链（实际使用方式）=====</span>
+<span style="color:#ff9f0a">public</span> String <span style="color:#0a84ff">parseDocument</span>(DocumentFile doc) {
+    String text = parseWithTika(doc.getStream(), doc.getFileName());
+
+    <span style="color:#86868b">// 如果 Tika 解析结果为空或太少（说明是扫描件），走 OCR</span>
+    <span style="color:#ff9f0a">if</span> (text == <span style="color:#ff9f0a">null</span> || text.trim().length() < 50) {
+        <span style="color:#ff9f0a">if</span> (doc.getType() == FileType.PDF) {
+            text = parseScannedPdfWithOCR(doc.getStream());
+        }
+    }
+    <span style="color:#ff9f0a">return</span> text;
+}</pre>
+    </div>
+
+    <div style="background:var(--selected-bg);border-radius:8px;padding:12px;margin-top:12px">
+      <p style="font-size:0.85rem;margin:0"><strong>策略模式设计：</strong>为每种文件类型注册不同的解析策略（WordHandler / PdfHandler / ExcelHandler / MarkdownHandler），Tika 先尝试通用解析，失败则走类型专属的降级策略。全部开源免费。</p>
+    </div>
+  </div>
+</div>
+
+<!-- Q8 -->
+<div class="section">
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="color:var(--accent)">Q8：Caffeine + Redis 多级缓存用在哪？怎么实现？</h3>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px">
+      <div>
+        <h4 style="color:var(--accent)">三处核心用途</h4>
+        <ol style="font-size:0.85rem;color:var(--text-secondary);line-height:2;padding-left:20px">
+          <li><strong>热点问题缓存</strong>——"怎么请假"这种高频问题，缓存答案避免重复调用 LLM（成本最高的环节）</li>
+          <li><strong>Embedding 缓存</strong>——相同文本的向量化结果缓存，避免重复调用 Embedding 模型</li>
+          <li><strong>权限/用户信息</strong>——SSO 登录后的用户信息、部门权限，缓存减少 DB 查询</li>
+        </ol>
+      </div>
+      <div>
+        <h4 style="color:var(--accent)">两级缓存架构</h4>
+        <div style="font-size:0.85rem;color:var(--text-secondary);line-height:1.8">
+          <strong>L1: Caffeine</strong>（本地 JVM 内存）<br>
+          → 容量 1000 条，TTL 5分钟，极速 &lt; 0.01ms<br><br>
+          <strong>L2: Redis</strong>（分布式共享）<br>
+          → 容量 10 万条，TTL 1小时，跨实例共享
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#1d1d1f;border-radius:8px;padding:16px;margin-top:12px;overflow-x:auto">
+      <pre style="font-size:12px;line-height:1.6;color:#34c759;margin:0">
+<span style="color:#86868b">// ===== 多级缓存实现（基于 Spring Cache + Caffeine + Redis）=====</span>
+
+<span style="color:#ff9f0a">@Service</span>
+<span style="color:#ff9f0a">public class</span> <span style="color:#0a84ff">QuestionCacheService</span> {
+
+    <span style="color:#ff9f0a">@Autowired</span> <span style="color:#ff9f0a">private</span> CacheManager caffeineCache;   <span style="color:#86868b">// L1: Caffeine</span>
+    <span style="color:#ff9f0a">@Autowired</span> <span style="color:#ff9f0a">private</span> RedisTemplate&lt;String, String&gt; redis;  <span style="color:#86868b">// L2: Redis</span>
+    <span style="color:#ff9f0a">@Autowired</span> <span style="color:#ff9f0a">private</span> ChatService chatService;          <span style="color:#86868b">// LLM 调用</span>
+
+    <span style="color:#86868b">// 多级缓存查询</span>
+    <span style="color:#ff9f0a">public</span> String <span style="color:#0a84ff">getAnswer</span>(String question, String deptId) {
+        String cacheKey = <span style="color:#34c759">"qa:"</span> + deptId + <span style="color:#34c759">":"</span> + hash(question);
+
+        <span style="color:#86868b">// L1: 查 Caffeine（0.01ms）</span>
+        Cache caffeine = caffeineCache.getCache(<span style="color:#34c759">"questions"</span>);
+        String cached = caffeine.get(cacheKey, String.class);
+        <span style="color:#ff9f0a">if</span> (cached != <span style="color:#ff9f0a">null</span>) <span style="color:#ff9f0a">return</span> cached;
+
+        <span style="color:#86868b">// L2: 查 Redis（1ms）</span>
+        cached = redis.opsForValue().get(cacheKey);
+        <span style="color:#ff9f0a">if</span> (cached != <span style="color:#ff9f0a">null</span>) {
+            caffeine.put(cacheKey, cached);  <span style="color:#86868b">// 回填 L1</span>
+            <span style="color:#ff9f0a">return</span> cached;
+        }
+
+        <span style="color:#86868b">// L3: 调用 LLM（1000-5000ms）</span>
+        String answer = chatService.chat(cacheKey, question)
+            .collectList().block().stream().collect(Collectors.joining());
+
+        <span style="color:#86868b">// 同时写入 L1 和 L2</span>
+        caffeine.put(cacheKey, answer);
+        redis.opsForValue().set(cacheKey, answer, Duration.ofHours(1));
+
+        <span style="color:#ff9f0a">return</span> answer;
+    }
+
+    <span style="color:#ff9f0a">private</span> String <span style="color:#0a84ff">hash</span>(String question) {
+        <span style="color:#86868b">// 对问题做语义哈希（相似问法映射到同一缓存 key）</span>
+        <span style="color:#86868b">// 简单版：MD5；高级版：先用 Embedding 找到最相似已缓存问题</span>
+        <span style="color:#ff9f0a">return</span> DigestUtils.md5Hex(question.trim().toLowerCase());
+    }
+}</pre>
+    </div>
+
+    <div style="background:var(--selected-bg);border-radius:8px;padding:12px;margin-top:12px">
+      <p style="font-size:0.85rem;margin:0"><strong>命中率预期：</strong>L1 Caffeine 命中率 30-40%（热点问题重复问），L2 Redis 命中率 60-70%（跨用户共享），总缓存命中率约 70%，即可省 70% 的 LLM API 费用。</p>
+    </div>
+  </div>
+</div>
+
+<!-- Q9 -->
+<div class="section">
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="color:var(--accent)">Q9：Prometheus + Grafana + Actuator 监控什么？怎么落实？</h3>
+
+    <div class="split" style="margin-top:12px">
+      <div>
+        <h4 style="color:var(--accent)">监控什么？</h4>
+        <table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+          <tr style="background:var(--bg-secondary)"><td style="padding:6px 10px"><strong>LLM 调用</strong></td><td style="padding:6px 10px;color:var(--text-secondary)">次数、延迟、成功率、Token 消耗</td></tr>
+          <tr><td style="padding:6px 10px"><strong>检索性能</strong></td><td style="padding:6px 10px;color:var(--text-secondary)">召回率、延迟、Top-K 命中率</td></tr>
+          <tr style="background:var(--bg-secondary)"><td style="padding:6px 10px"><strong>并发与错误</strong></td><td style="padding:6px 10px;color:var(--text-secondary)">QPS、响应时间、错误率、限流触发</td></tr>
+          <tr><td style="padding:6px 10px"><strong>基础设施</strong></td><td style="padding:6px 10px;color:var(--text-secondary)">JVM 内存/GC、Redis/Milvus/ES 健康</td></tr>
+          <tr style="background:var(--bg-secondary)"><td style="padding:6px 10px"><strong>文档处理</strong></td><td style="padding:6px 10px;color:var(--text-secondary)">队列积压、处理成功率、处理耗时</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4 style="color:var(--accent)">怎么落实？</h4>
+        <ol style="font-size:0.85rem;color:var(--text-secondary);line-height:2.2;padding-left:20px">
+          <li><strong>Actuator + Micrometer</strong> — Spring Boot 内置，暴露 /actuator/prometheus 端点，自动采集 JVM/HTTP/DB 指标</li>
+          <li><strong>自定义指标</strong> — 用 Micrometer 的 @Timed、Counter、Gauge 注解埋点（LLM 调用耗时、检索次数、缓存命中率）</li>
+          <li><strong>Prometheus</strong> — 定期抓取 /actuator/prometheus，存储时序数据</li>
+          <li><strong>Grafana</strong> — 连接 Prometheus 数据源，搭建仪表盘，配置告警规则（如错误率 > 5% 发钉钉/邮件）</li>
+        </ol>
+      </div>
+    </div>
+
+    <div style="background:#1d1d1f;border-radius:8px;padding:16px;margin-top:16px;overflow-x:auto">
+      <pre style="font-size:12px;line-height:1.6;color:#34c759;margin:0">
+<span style="color:#86868b">// ===== 1. Maven 依赖 =====</span>
+<span style="color:#86868b">// org.springframework.boot:spring-boot-starter-actuator</span>
+<span style="color:#86868b">// io.micrometer:micrometer-registry-prometheus</span>
+
+<span style="color:#86868b">// ===== 2. application.yaml =====</span>
+<span style="color:#86868b">// management.endpoints.web.exposure.include: health,prometheus,metrics</span>
+<span style="color:#86868b">// management.metrics.export.prometheus.enabled: true</span>
+
+<span style="color:#86868b">// ===== 3. 自定义埋点示例 =====</span>
+<span style="color:#ff9f0a">@Service</span>
+<span style="color:#ff9f0a">public class</span> <span style="color:#0a84ff">RetrievalService</span> {
+
+    <span style="color:#ff9f0a">private final</span> MeterRegistry meterRegistry;
+
+    <span style="color:#86868b">// 声明计数器：检索总次数</span>
+    <span style="color:#ff9f0a">private final</span> Counter retrievalCounter;
+
+    <span style="color:#86868b">// 声明直方图：检索耗时分布</span>
+    <span style="color:#ff9f0a">private final</span> Timer retrievalTimer;
+
+    <span style="color:#ff9f0a">public</span> <span style="color:#0a84ff">List&lt;Hit&gt;</span> retrieve(Query query) {
+        retrievalCounter.increment();  <span style="color:#86868b">// 计数 +1</span>
+
+        <span style="color:#ff9f0a">return</span> retrievalTimer.record(() -> {
+            <span style="color:#86868b">// 实际检索逻辑...</span>
+            <span style="color:#ff9f0a">return</span> milvusClient.search(query);
+        });
+    }
+}
+
+<span style="color:#86868b">// ===== 4. Grafana 仪表盘（核心面板）= =====</span>
+<span style="color:#86868b">// - QPS 曲线 (rate(http_requests_total[1m]))</span>
+<span style="color:#86868b">// - LLM 调用延迟 P50/P95/P99 (histogram_quantile)</span>
+<span style="color:#86868b">// - 检索延迟 P50/P95/P99</span>
+<span style="color:#86868b">// - 缓存命中率 = 缓存命中次数 / 总查询次数</span>
+<span style="color:#86868b">// - 错误率 = 错误请求 / 总请求</span>
+<span style="color:#86868b">// - JVM 堆内存使用率 & GC 频率</span>
+<span style="color:#86868b">// - 告警规则：错误率 > 5% | P99 > 5s | 内存 > 85%</span></pre>
+    </div>
+
+    <div style="background:var(--selected-bg);border-radius:8px;padding:12px;margin-top:12px">
+      <p style="font-size:0.85rem;margin:0"><strong>落实步骤：</strong>① 加依赖 + YAML 配置（10分钟）→ ② 核心服务埋点（30分钟）→ ③ Docker 启动 Prometheus + Grafana → ④ 导入 Spring Boot 仪表盘模板（Grafana 社区有现成的 JVM 面板 ID: 4701）→ ⑤ 配置钉钉/邮件告警。</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>企业级 RAG 知识库 - 01-核心模块全景图</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow-x: hidden; }
+    :root {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e5e5e7;
+      --border: #d1d1d6;
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #aeaeb2;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --success: #34c759;
+      --warning: #ff9f0a;
+      --error: #ff3b30;
+      --selected-bg: #e8f4fd;
+      --selected-border: #0071e3;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1d1d1f;
+        --bg-secondary: #2d2d2f;
+        --bg-tertiary: #3d3d3f;
+        --border: #424245;
+        --text-primary: #f5f5f7;
+        --text-secondary: #86868b;
+        --text-tertiary: #636366;
+        --accent: #0a84ff;
+        --accent-hover: #409cff;
+        --selected-bg: rgba(10, 132, 255, 0.15);
+        --selected-border: #0a84ff;
+      }
+    }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; padding: 2rem; max-width: 1200px; margin: 0 auto; }
+    h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; }
+    .section { margin-bottom: 2rem; }
+    .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .option { background: var(--bg-secondary); border: 2px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: flex-start; gap: 1rem; }
+    .option .letter { background: var(--bg-tertiary); color: var(--text-secondary); width: 1.75rem; height: 1.75rem; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.85rem; flex-shrink: 0; }
+    .option .content { flex: 1; }
+    .option .content h3 { font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .option .content p { color: var(--text-secondary); font-size: 0.85rem; margin: 0; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .card-body { padding: 1rem; }
+    .card-body h3 { margin-bottom: 0.25rem; }
+    .card-body p { color: var(--text-secondary); font-size: 0.85rem; }
+    .mockup { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 1.5rem; }
+    .mockup-header { background: var(--bg-tertiary); padding: 0.5rem 1rem; font-size: 0.75rem; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+    .mockup-body { padding: 1.5rem; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+    .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .pros, .cons { background: var(--bg-secondary); border-radius: 8px; padding: 1rem; }
+    .pros h4 { color: var(--success); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .cons h4 { color: var(--error); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .pros ul, .cons ul { margin-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); }
+    .pros li, .cons li { margin-bottom: 0.25rem; }
+    .placeholder { background: var(--bg-tertiary); border: 2px dashed var(--border); border-radius: 8px; padding: 2rem; text-align: center; color: var(--text-tertiary); }
+    table { border-collapse: collapse; }
+    th, td { padding: 8px 12px; text-align: left; }
+    pre { background: var(--bg-tertiary); color: var(--text-primary); border-radius: 8px; padding: 16px; overflow-x: auto; font-size: 12px; line-height: 1.6; }
+    code { background: var(--bg-tertiary); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+    hr { margin: 24px 0; border: none; border-top: 1px solid var(--border); }
+    ol, ul { padding-left: 20px; }
+    li { line-height: 1.8; }
+  </style>
+</head>
+<body>
+<h2>企业级 RAG 知识库 - 核心模块全景图</h2>
+<p class="subtitle">一个完整的企业级 RAG 知识库通常包含以下六大核心模块。请先浏览整体架构，我们在后续逐步细化每个模块的技术选型。</p>
+
+<div class="section">
+  <h3>六大核心模块</h3>
+</div>
+
+<div class="cards">
+  <div class="card" data-choice="ingest" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h3>1. 文档摄入层</h3>
+      <p>多格式文档解析（PDF/Word/Markdown/HTML/图片）、文档分割策略、元数据提取、OCR 识别</p>
+      <p class="label">关键能力：格式兼容性 + 解析精度</p>
+    </div>
+  </div>
+  <div class="card" data-choice="embedding" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h3>2. 向量化与索引层</h3>
+      <p>Embedding 模型选型、向量数据库、稀疏/稠密混合检索、索引构建策略</p>
+      <p class="label">关键能力：语义理解 + 检索精度</p>
+    </div>
+  </div>
+  <div class="card" data-choice="retrieval" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h3>3. 检索层</h3>
+      <p>混合检索（Hybrid Search）、Rerank 重排序、多路召回融合、查询改写/扩展</p>
+      <p class="label">关键能力：召回率 + 准确率</p>
+    </div>
+  </div>
+  <div class="card" data-choice="generation" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h3>4. 生成层</h3>
+      <p>LLM 推理、上下文构建、引用溯源、工具调用（Function Calling）、流式输出</p>
+      <p class="label">关键能力：答案质量 + 可追溯性</p>
+    </div>
+  </div>
+  <div class="card" data-choice="governance" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h3>5. 治理与安全层</h3>
+      <p>权限控制（RBAC/ABAC）、数据脱敏、审计日志、内容安全审核、限流熔断</p>
+      <p class="label">关键能力：安全合规 + 可审计</p>
+    </div>
+  </div>
+  <div class="card" data-choice="platform" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h3>6. 平台与运营层</h3>
+      <p>知识库管理后台、对话管理、用户管理、监控告警、效果评估、反馈闭环</p>
+      <p class="label">关键能力：可运营 + 可观测</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>数据流示意</h3>
+  <div style="background:var(--bg-secondary);border-radius:12px;padding:24px;text-align:center;font-family:monospace;font-size:14px;line-height:2.2">
+    📄 文档上传 → 🔧 解析/分割 → 🧮 向量化 → 💾 向量数据库<br>
+    ❓ 用户提问 → 🔍 问题改写 → 🎯 混合检索 → 📊 Rerank → 🤖 LLM 生成 → ✅ 带引用答案
+  </div>
+</div>
+</body>
+</html>

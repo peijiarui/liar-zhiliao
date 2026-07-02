@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>企业级 RAG 知识库 - 06-核心难点与并发设计</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow-x: hidden; }
+    :root {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e5e5e7;
+      --border: #d1d1d6;
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #aeaeb2;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --success: #34c759;
+      --warning: #ff9f0a;
+      --error: #ff3b30;
+      --selected-bg: #e8f4fd;
+      --selected-border: #0071e3;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1d1d1f;
+        --bg-secondary: #2d2d2f;
+        --bg-tertiary: #3d3d3f;
+        --border: #424245;
+        --text-primary: #f5f5f7;
+        --text-secondary: #86868b;
+        --text-tertiary: #636366;
+        --accent: #0a84ff;
+        --accent-hover: #409cff;
+        --selected-bg: rgba(10, 132, 255, 0.15);
+        --selected-border: #0a84ff;
+      }
+    }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; padding: 2rem; max-width: 1200px; margin: 0 auto; }
+    h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; }
+    .section { margin-bottom: 2rem; }
+    .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .option { background: var(--bg-secondary); border: 2px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: flex-start; gap: 1rem; }
+    .option .letter { background: var(--bg-tertiary); color: var(--text-secondary); width: 1.75rem; height: 1.75rem; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.85rem; flex-shrink: 0; }
+    .option .content { flex: 1; }
+    .option .content h3 { font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .option .content p { color: var(--text-secondary); font-size: 0.85rem; margin: 0; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .card-body { padding: 1rem; }
+    .card-body h3 { margin-bottom: 0.25rem; }
+    .card-body p { color: var(--text-secondary); font-size: 0.85rem; }
+    .mockup { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 1.5rem; }
+    .mockup-header { background: var(--bg-tertiary); padding: 0.5rem 1rem; font-size: 0.75rem; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+    .mockup-body { padding: 1.5rem; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+    .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .pros, .cons { background: var(--bg-secondary); border-radius: 8px; padding: 1rem; }
+    .pros h4 { color: var(--success); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .cons h4 { color: var(--error); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .pros ul, .cons ul { margin-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); }
+    .pros li, .cons li { margin-bottom: 0.25rem; }
+    .placeholder { background: var(--bg-tertiary); border: 2px dashed var(--border); border-radius: 8px; padding: 2rem; text-align: center; color: var(--text-tertiary); }
+    table { border-collapse: collapse; }
+    th, td { padding: 8px 12px; text-align: left; }
+    pre { background: var(--bg-tertiary); color: var(--text-primary); border-radius: 8px; padding: 16px; overflow-x: auto; font-size: 12px; line-height: 1.6; }
+    code { background: var(--bg-tertiary); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+    hr { margin: 24px 0; border: none; border-top: 1px solid var(--border); }
+    ol, ul { padding-left: 20px; }
+    li { line-height: 1.8; }
+  </style>
+</head>
+<body>
+<h2>核心技术难点与并发设计</h2>
+<p class="subtitle">企业级 RAG 知识库的 8 大难点及应对策略</p>
+
+<div class="section">
+  <h3>难点 1：文档解析精度</h3>
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:16px">
+    <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.6">
+      <strong>问题：</strong>PDF 复杂排版（多栏、表格、图片穿插）解析后结构丢失；PPT 的文字层级关系难以还原；扫描件需要 OCR。<br>
+      <strong>策略：</strong>① Apache Tika 做格式统一解析 → ② PDFBox 处理复杂 PDF → ③ Tesseract 做 OCR 降级 → ④ 按文档类型注册不同的解析策略链（策略模式）
+    </p>
+  </div>
+</div>
+
+<div class="section">
+  <h3>难点 2：文档分割策略</h3>
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:16px">
+    <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.6">
+      <strong>问题：</strong>切太碎丢失上下文，切太大检索不精确。不同文档类型需要不同策略。<br>
+      <strong>策略：</strong>父子文档模式（Parent-Child Chunk）。Child（512 tokens）做检索，检索命中后返回 Parent（2048 tokens）作为 LLM 上下文。Markdown 按标题层级分段，PDF 按页+段落分段。<br>
+      <strong>LangChain4j：</strong>DocumentSplitter + 自定义 SegmentBuilder
+    </p>
+  </div>
+</div>
+
+<div class="section">
+  <h3>难点 3：混合检索 + Rerank</h3>
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:16px">
+    <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.6">
+      <strong>问题：</strong>仅向量检索 → 专业术语匹配差；仅关键词检索 → 语义理解差。需要融合两路结果。<br>
+      <strong>策略：</strong>① 查询改写（LLM 扩展同义词/分解复杂问题）→ ② 稠密+稀疏双路各召回 Top-20 → ③ RRF（倒数排名融合）合并为 Top-30 → ④ BGE-Reranker 精排取 Top-5 → ⑤ 送入 LLM。<br>
+      <strong>LangChain4j：</strong>EmbeddingStoreContentRetriever + WebSearchContentRetriever(ES) + 自定义 FusionRetriever
+    </p>
+  </div>
+</div>
+
+<div class="section">
+  <h3>难点 4：引用溯源（Citation）</h3>
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:16px">
+    <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.6">
+      <strong>问题：</strong>LLM 生成答案后，用户需要知道"这句话来自哪个文档的第几页"。企业场景下，不可追溯的答案是没用的。<br>
+      <strong>策略：</strong>① 每个 Chunk 存储来源元数据（文档 ID、页码、段落号）→ ② 检索时带出元数据 → ③ System Prompt 要求 LLM 在答案中标注引用编号 → ④ 返回时附带引用文档链接
+    </p>
+  </div>
+</div>
+
+<div class="section">
+  <h3>难点 5：Embedding 模型选型</h3>
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:16px">
+    <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.6">
+      <strong>问题：</strong>中英文混合场景下，通用模型中文语义理解差；API 调用延迟不可控。<br>
+      <strong>推荐方案：</strong>
+    </p>
+    <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color);margin-top:8px">
+      <tr style="background:var(--bg-secondary)"><td style="padding:8px">BGE-M3 (BAAI)</td><td style="padding:8px;font-size:0.85rem;color:var(--text-secondary)">中英双语，1024维，支持稠密+稀疏双表示，本地部署</td></tr>
+      <tr><td style="padding:8px">GTE-Qwen2-7B-Instruct</td><td style="padding:8px;font-size:0.85rem;color:var(--text-secondary)">阿里出品，中文最强之一，需 GPU</td></tr>
+      <tr style="background:var(--bg-secondary)"><td style="padding:8px">text-embedding-3-large (OpenAI)</td><td style="padding:8px;font-size:0.85rem;color:var(--text-secondary)">API 调用，质量高但延迟+费用，备选</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <h3>难点 6：多租户数据隔离</h3>
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:16px">
+    <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.6">
+      <strong>问题：</strong>部门 A 的文件不能让部门 B 检索到（除非共享）。每个检索请求必须带租户上下文。<br>
+      <strong>策略：</strong>① PostgreSQL 表 level：tenant_id + dept_id 列 → ② Milvus：Partition Key = knowledgeBaseId → ③ ES：基于 index 隔离或 alias 路由 → ④ 检索时注入 ThreadLocal 租户上下文 → ⑤ 所有查询自动过滤当前用户有权访问的知识库
+    </p>
+  </div>
+</div>
+
+<div class="section">
+  <h3>难点 7：LLM 幻觉与安全</h3>
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:16px">
+    <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.6">
+      <strong>问题：</strong>知识库里没有的答案，LLM 可能会编造（幻觉）；用户可能尝试 Prompt 注入攻击。<br>
+      <strong>策略：</strong>① System Prompt 约束"只根据提供的文档回答，不知道就说不知道"→ ② 答案置信度评分（检索相关性低于阈值时拒绝回答）→ ③ 输入过滤（敏感词/注入检测）→ ④ 答案二次校验（LLM 自检或规则校验）
+    </p>
+  </div>
+</div>
+
+<div class="section">
+  <h3>难点 8：知识库持续更新</h3>
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:16px">
+    <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.6">
+      <strong>问题：</strong>文档更新/删除后，向量库和 ES 索引中的数据必须同步更新，否则返回过期答案。<br>
+      <strong>策略：</strong>① 文档 → Chunk 时记录映射关系（doc_id → chunk_id 列表）→ ② 更新时先删旧 Chunk 再写新 Chunk → ③ 文件 MD5 指纹追踪变更 → ④ Wiki 通过 Webhook 触发增量更新 → ⑤ 定时全量对账任务
+    </p>
+  </div>
+</div>
+
+<hr style="margin: 24px 0; border: none; border-top: 1px solid var(--border)">
+
+<h3>并发设计</h3>
+
+<div class="section">
+  <h4>3000 人内部知识库的并发评估</h4>
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:16px">
+    <table style="width:100%;border-collapse:collapse">
+      <tr style="background:var(--bg-secondary)">
+        <td style="padding:8px 12px"><strong>指标</strong></td>
+        <td style="padding:8px 12px"><strong>估算</strong></td>
+        <td style="padding:8px 12px"><strong>说明</strong></td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px">日活用户 (DAU)</td><td style="padding:8px 12px">300-600</td><td style="padding:8px 12px;font-size:0.85rem;color:var(--text-secondary)">10-20% 员工使用</td>
+      </tr>
+      <tr style="background:var(--bg-secondary)">
+        <td style="padding:8px 12px">峰值 QPS</td><td style="padding:8px 12px">50-150</td><td style="padding:8px 12px;font-size:0.85rem;color:var(--text-secondary)">工作日上午 9-11 点</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px">文档处理吞吐</td><td style="padding:8px 12px">异步批量</td><td style="padding:8px 12px;font-size:0.85rem;color:var(--text-secondary)">RabbitMQ 解耦，Worker 水平扩展</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <h4>并发架构策略</h4>
+  <div class="cards">
+    <div class="card">
+      <div class="card-body">
+        <h3>WebFlux 非阻塞</h3>
+        <p>对话请求全链路异步（Controller → Service → LLM API），不阻塞线程池。150 QPS 单实例轻松承载。</p>
+        <span class="label">Spring WebFlux + Reactor</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <h3>连接池配置</h3>
+        <p>Milvus/ES/Redis 全用连接池，LLM API 也配置 HTTP 连接池。避免频繁建连/断连。</p>
+        <span class="label">gRPC 连接池 + 连接复用</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <h3>多级缓存</h3>
+        <p>L1: Caffeine 本地缓存（热点问题）→ L2: Redis（查询缓存/会话）→ 穿透保护（布隆过滤器+空值缓存）</p>
+        <span class="label">Caffeine + Redis + 缓存穿透保护</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <h3>限流与降级</h3>
+        <p>Resilience4j Rate Limiter 按用户/部门限流。LLM 超时降级为"请稍后重试"。</p>
+        <span class="label">Resilience4j + Circuit Breaker</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h4>结论</h4>
+  <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.6">
+    <strong>3000 人内部知识库的并发压力远低于 C 端产品</strong>（日均 150 QPS 以内）。一个配置合理的 Spring Boot 单体 + 连接池 + Redis 缓存完全够用。<br><br>
+    真正的瓶颈不在 Web 层，而在 <strong>LLM API 调用延迟</strong>（通常 1-5 秒）和 <strong>文档解析吞吐</strong>（大 PDF 耗时）。这两个通过异步化解决即可。
+  </p>
+</div>
+</body>
+</html>

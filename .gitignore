@@ -37,3 +37,7 @@ build/
 
 ### Local File ###
 data/
+
+### Superpowers ###
+.superpowers/
+/docs/html/build-standalone.sh
