@@ -4,10 +4,12 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ChatMessageDeserializer;
 import dev.langchain4j.data.message.ChatMessageSerializer;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.liar.ai.liarrag.utils.LocalFileStore;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -19,31 +21,34 @@ import java.util.List;
  */
 @Slf4j
 @Repository
+@AllArgsConstructor
 public class CustomChatMemoryStore implements ChatMemoryStore {
 
-    LocalFileStore localFileStore = new LocalFileStore();
+    private final StringRedisTemplate redisTemplate;
 
     @Override
     public List<ChatMessage> getMessages(Object memoryId) {
-        // 根据 memoryId 从本地文件存储中读取会话记忆数据
-        // 如果存在数据，则将其从 JSON 格式反序列化为 ChatMessage 列表
-        // 如果不存在数据（Optional 为空），则记录日志并返回一个空的 ChatMessage 列表
-        return localFileStore.read(memoryId.toString())
-                .map(ChatMessageDeserializer::messagesFromJson)
-                .orElseGet(() -> {
-                    log.info("没有memoryId为【{}】的会话记忆", memoryId);
-                    return List.of();
-                });
+
+        // 获取会话消息
+        // 1. 从Redis中获取消息对应的JSON 数据
+        String jsonData = redisTemplate.opsForValue().get(memoryId.toString());
+
+        // 2. 借助 ChatMessageSerializer（由langchain4j提供） 将 JSON 数据反序列化为 消息列表 并返回
+        return ChatMessageDeserializer.messagesFromJson(jsonData);
     }
 
     @Override
     public void updateMessages(Object memoryId, List<ChatMessage> messages) {
-        String json = ChatMessageSerializer.messagesToJson(messages);
-        localFileStore.save(memoryId.toString(), json);
+        // 更新会话消息
+        // 1. 借助 ChatMessageSerializer（由langchain4j提供） 将 消息列表序列化为 JSON
+        String jsonData = ChatMessageSerializer.messagesToJson(messages);
+        //2. 将 JSON 数据写入Redis
+        redisTemplate.opsForValue().set(memoryId.toString(), jsonData, Duration.ofDays(1));
     }
 
     @Override
     public void deleteMessages(Object memoryId) {
-        localFileStore.delete(memoryId.toString());
+        // 删除会话消息
+        redisTemplate.delete(memoryId.toString());
     }
 }
