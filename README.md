@@ -74,10 +74,10 @@ mvn spring-boot:run
 
 ```bash
 # 构建镜像
-docker build -t liar-rag .
+docker build -t liar-zhiliao .
 
 # 运行容器
-docker run -p 8080:8080 -e DEEPSEEK_API_KEY=your_key liar-rag
+docker run -p 8080:8080 -e DEEPSEEK_API_KEY=your_key liar-zhiliao
 ```
 
 ## API 文档
@@ -106,9 +106,9 @@ curl -N "http://localhost:8080/chat/chat?memoryId=user001&message=你好"
 ## 项目结构
 
 ```
-liar-rag/
-├── src/main/java/org/liar/ai/liarrag/
-│   ├── LiarRagApplication.java      # 应用入口
+liar-zhiliao/
+├── src/main/java/org/liar/ai/liarziliao/
+│   ├── LiarZhiliaApplication.java      # 应用入口
 │   ├── config/
 │   │   └── BeansConfig.java         # 会话记忆配置
 │   ├── controller/

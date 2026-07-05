@@ -83,14 +83,14 @@
 ### 3.2 Maven 模块拆分
 
 ```
-liar-rag/
-├── liar-rag-common      # 公共模型、工具类、常量
-├── liar-rag-ingestion   # 文档摄入（解析/分割/向量化）
-├── liar-rag-retrieval   # 检索服务（混合检索/Rerank）
-├── liar-rag-chat        # 对话服务（LLM 编排/流式输出）
-├── liar-rag-auth        # 认证授权（SSO/RBAC/多租户）
-├── liar-rag-admin       # 管理后台（知识库/用户/监控）
-└── liar-rag-app         # 启动入口，组装所有模块
+liar-zhiliao/
+├── zhiliao-common      # 公共模型、工具类、常量
+├── zhiliao-ingestion   # 文档摄入（解析/分割/向量化）
+├── zhiliao-retrieval   # 检索服务（混合检索/Rerank）
+├── zhiliao-chat        # 对话服务（LLM 编排/流式输出）
+├── zhiliao-auth        # 认证授权（SSO/RBAC/多租户）
+├── zhiliao-admin       # 管理后台（知识库/用户/监控）
+└── zhiliao-app         # 启动入口，组装所有模块
 ```
 
 ---

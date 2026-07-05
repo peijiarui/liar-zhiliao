@@ -12,10 +12,10 @@ mvn clean package
 mvn test -DskipTests=false
 
 # 运行单个测试类
-mvn test -Dtest=LiarRagApplicationTests -DskipTests=false
+mvn test -Dtest=LiarZhiliaApplicationTests -DskipTests=false
 
 # 运行单个测试方法
-mvn test -Dtest=LiarRagApplicationTests#contextLoads -DskipTests=false
+mvn test -Dtest=LiarZhiliaApplicationTests#contextLoads -DskipTests=false
 
 # 启动应用
 mvn spring-boot:run -DskipTests=true
