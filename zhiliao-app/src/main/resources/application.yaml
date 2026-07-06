@@ -2,13 +2,30 @@ server:
   port: 8080
 
 spring:
+#  main:
+#    allow-circular-references: true
   application:
     name: liar-zhiliao
   data:
     redis:
-      host: localhost
+      host: ${resource-server-host}
       port: 6379
       password: Pjr@18556720503
+  datasource:
+    url: jdbc:postgresql://${resource-server-host}:5432/zhiliao?useUnicode=true&characterEncoding=utf8
+    username: peijiarui
+    password: Pjr@18556720503
+    driver-class-name: org.postgresql.Driver
+  rabbitmq:
+    host: ${resource-server-host}
+    port: 5672
+    username: zhiliao
+    password: 18556720503
+    virtual-host: /
+    listener:
+      simple:
+        concurrency: 1
+        max-concurrency: 3
 
 # langchain4j 相关配置
 langchain4j:
@@ -31,7 +48,36 @@ langchain4j:
       model-name: text-embedding-v4
       log-requests: true
       log-responses: true
+#  milvus:
+#    host: ${resource-server-host}
+#    port: 19530
+#    collection-name: zhiliao_chunks
+#    username: peijiarui
+#    password: Pjr@18556720503
+  community:
+    redis:
+      host: ${resource-server-host}
+      port: 6379
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
 
 logging:
   level:
     dev.langchain4j: debug
+#    org.springframework.context.support.DefaultListableBeanFactory: debug
+
+# zhiliao custom config
+zhiliao:
+  retrieval:
+    store-type: milvus  # milvus (default) or in-memory
+  minio:
+    endpoint: http://${resource-server-host}:9000
+    access-key: peijiarui
+    secret-key: Pjr@18556720503
+    bucket: zhiliao-docs
+  rabbitmq:
+    queue: zhiliao.document.process

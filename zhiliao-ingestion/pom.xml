@@ -18,18 +18,76 @@
             <artifactId>zhiliao-common</artifactId>
         </dependency>
 
-        <!-- langchain4j 主模块：提供文档加载、分割、InMemoryEmbeddingStore 等 -->
+        <!-- langchain4j Easy RAG：提供文档加载、分割、内存向量存储等 -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j</artifactId>
-            <!-- langchain4j 主模块使用稳定版（milvus/其它 beta 模块的父依赖） -->
-            <version>1.17.0</version>
+            <artifactId>langchain4j-easy-rag</artifactId>
         </dependency>
 
-        <!-- milvus 向量数据库客户端 -->
+<!--        &lt;!&ndash; milvus 向量数据库客户端 &ndash;&gt;-->
+<!--        <dependency>-->
+<!--            <groupId>dev.langchain4j</groupId>-->
+<!--            <artifactId>langchain4j-milvus-spring-boot-starter</artifactId>-->
+<!--        </dependency>-->
+
+        <!-- Spring Boot Web -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- MyBatis-Plus -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+        </dependency>
+
+        <!-- PostgreSQL -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- RabbitMQ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <!-- Apache Tika -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parsers-standard-package</artifactId>
+        </dependency>
+
+        <!-- MinIO -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- zhiliao-retrieval for EmbeddingService & VectorStore -->
+        <dependency>
+            <groupId>org.liar.ai</groupId>
+            <artifactId>zhiliao-retrieval</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-milvus</artifactId>
+            <artifactId>langchain4j-community-redis-spring-boot-starter</artifactId>
+            <version>${langchain4j.version}</version>
         </dependency>
     </dependencies>
 

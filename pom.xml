@@ -30,6 +30,7 @@
         <java.version>17</java.version>
         <langchain4j.version>1.17.0-beta27</langchain4j.version>
         <skipTests>true</skipTests>
+        <mybatis-plus.version>3.5.9</mybatis-plus.version>
     </properties>
 
     <dependencyManagement>
@@ -96,10 +97,36 @@
                 <version>${langchain4j.version}</version>
             </dependency>
 
+<!--            <dependency>-->
+<!--                <groupId>dev.langchain4j</groupId>-->
+<!--                <artifactId>langchain4j-milvus-spring-boot-starter</artifactId>-->
+<!--                <version>${langchain4j.version}</version>-->
+<!--            </dependency>-->
+
+            <!-- Apache Tika -->
             <dependency>
-                <groupId>dev.langchain4j</groupId>
-                <artifactId>langchain4j-milvus</artifactId>
-                <version>${langchain4j.version}</version>
+                <groupId>org.apache.tika</groupId>
+                <artifactId>tika-core</artifactId>
+                <version>3.1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tika</groupId>
+                <artifactId>tika-parsers-standard-package</artifactId>
+                <version>3.1.0</version>
+            </dependency>
+
+            <!-- MinIO -->
+            <dependency>
+                <groupId>io.minio</groupId>
+                <artifactId>minio</artifactId>
+                <version>8.5.17</version>
+            </dependency>
+
+            <!-- MyBatis-Plus -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

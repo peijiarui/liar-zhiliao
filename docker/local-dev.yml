@@ -1,0 +1,288 @@
+# =============================================================================
+# Liar Zhiliao - Local Development Environment
+# =============================================================================
+# Usage:
+#   docker compose -f docker/local-dev.yml up -d
+#   docker compose -f docker/local-dev.yml down
+#
+# To enable Elasticsearch, uncomment the `elasticsearch` service block below
+# and uncomment the `depends_on` reference in the network comment section.
+#
+# To verify all services are healthy:
+#   docker compose -f docker/local-dev.yml ps
+# =============================================================================
+
+networks:
+  zhiliao-net:
+    name: zhiliao-net
+    driver: bridge
+
+volumes:
+  postgres-data:
+    name: zhiliao-postgres-data
+    driver: local
+  redis-data:
+    name: zhiliao-redis-data
+    driver: local
+  minio-data:
+    name: zhiliao-minio-data
+    driver: local
+  rabbitmq-data:
+    name: zhiliao-rabbitmq-data
+    driver: local
+  etcd-data:
+    name: zhiliao-etcd-data
+    driver: local
+  milvus-data:
+    name: zhiliao-milvus-data
+    driver: local
+  milvus-minio-data:
+    name: zhiliao-milvus-minio-data
+    driver: local
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16 - Main Business Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: zhiliao-postgres
+    restart: unless-stopped
+    networks:
+      - zhiliao-net
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: zhiliao
+      POSTGRES_USER: zhiliao
+      POSTGRES_PASSWORD: zhiliao123
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zhiliao -d zhiliao"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Redis Stack - Session Memory & Caching (includes RedisInsight capabilities)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis/redis-stack:latest
+    container_name: zhiliao-redis
+    restart: unless-stopped
+    networks:
+      - zhiliao-net
+    ports:
+      - "6379:6379"
+      - "8001:8001"           # RedisInsight web UI (optional, local dev only)
+    environment:
+      # No password set for local development
+      REDIS_ARGS: "--save 60 1000 --appendonly yes"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # MinIO - S3-Compatible Object Storage (Document Store)
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: zhiliao-minio
+    restart: unless-stopped
+    networks:
+      - zhiliao-net
+    ports:
+      - "9000:9000"           # S3 API
+      - "9001:9001"           # Console UI
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Create the required bucket after MinIO starts
+  minio-init:
+    image: minio/mc:latest
+    container_name: zhiliao-minio-init
+    restart: "no"
+    networks:
+      - zhiliao-net
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc config host add zhiliao http://minio:9000 minioadmin minioadmin123) do echo 'Waiting for MinIO...' && sleep 2; done;
+      /usr/bin/mc mb zhiliao/zhiliao-docs --ignore-existing;
+      /usr/bin/mc policy set public zhiliao/zhiliao-docs;
+      echo 'Bucket zhiliao-docs created successfully.';
+      exit 0;
+      "
+
+  # ---------------------------------------------------------------------------
+  # RabbitMQ - Async Task Queue (Message Broker)
+  # ---------------------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: zhiliao-rabbitmq
+    restart: unless-stopped
+    networks:
+      - zhiliao-net
+    ports:
+      - "5672:5672"           # AMQP
+      - "15672:15672"         # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: zhiliao
+      RABBITMQ_DEFAULT_PASS: zhiliao123
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_alive"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Milvus Standalone - Vector Database
+  # ---------------------------------------------------------------------------
+  # Milvus standalone mode requires etcd (metadata storage) and an internal
+  # MinIO (data storage). The official Milvus docker-compose splits these into
+  # three cooperating containers.
+  # ---------------------------------------------------------------------------
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.18
+    container_name: zhiliao-milvus-etcd
+    restart: unless-stopped
+    networks:
+      - zhiliao-net
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    volumes:
+      - etcd-data:/etcd
+    command: >
+      etcd
+      --data-dir=/etcd
+      --listen-client-urls=http://0.0.0.0:2379
+      --advertise-client-urls=http://0.0.0.0:2379
+      --listen-peer-urls=http://0.0.0.0:2380
+      --initial-advertise-peer-urls=http://0.0.0.0:2380
+      --initial-cluster=default=http://0.0.0.0:2380
+      --initial-cluster-token=etcd-cluster
+      --initial-cluster-state=new
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  milvus-minio:
+    image: minio/minio:latest
+    container_name: zhiliao-milvus-minio
+    restart: unless-stopped
+    networks:
+      - zhiliao-net
+    # Expose Milvus MinIO ports only if you need direct debugging
+    # ports:
+    #   - "9002:9000"
+    #   - "9003:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - milvus-minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  milvus:
+    image: milvusdb/milvus:latest
+    container_name: zhiliao-milvus
+    restart: unless-stopped
+    networks:
+      - zhiliao-net
+    ports:
+      - "19530:19530"         # gRPC
+      # - "9091:9091"         # HTTP API (optional, uncomment if needed)
+    environment:
+      # External etcd endpoint (disables embedded etcd automatically)
+      ETCD_ENDPOINTS: etcd:2379
+      # External MinIO address (disables embedded MinIO automatically)
+      MINIO_ADDRESS: milvus-minio:9000
+      # Object storage configuration
+      common__storageType: "minio"
+      minio__bucketName: "zhiliao-milvus-bucket"
+      minio__accessKeyID: "minioadmin"
+      minio__secretAccessKey: "minioadmin123"
+      # Milvus internal segment storage
+      minio__useSSL: "false"
+    volumes:
+      - milvus-data:/var/lib/milvus
+    depends_on:
+      etcd:
+        condition: service_healthy
+      milvus-minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:9091/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # ---------------------------------------------------------------------------
+  # Elasticsearch - Keyword Search (Commented Out)
+  # ---------------------------------------------------------------------------
+  # Uncomment this block and add `elasticsearch` to any service's `depends_on`
+  # when you need full-text keyword search capabilities alongside vector search.
+  # ---------------------------------------------------------------------------
+  # elasticsearch:
+  #   image: elasticsearch:8.17.3
+  #   container_name: zhiliao-elasticsearch
+  #   restart: unless-stopped
+  #   networks:
+  #     - zhiliao-net
+  #   ports:
+  #     - "9200:9200"           # REST API
+  #     - "9300:9300"           # Transport
+  #   environment:
+  #     discovery.type: single-node
+  #     xpack.security.enabled: "false"
+  #     ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+  #   volumes:
+  #     - es-data:/usr/share/elasticsearch/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl --silent --fail http://localhost:9200/_cluster/health || exit 1"]
+  #     interval: 10s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 60s
+
+# volumes used by commented-out services:
+# es-data:
+#   name: zhiliao-es-data
+#   driver: local
