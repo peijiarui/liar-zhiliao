@@ -17,6 +17,20 @@
             <groupId>org.liar.ai</groupId>
             <artifactId>zhiliao-common</artifactId>
         </dependency>
+
+        <!-- langchain4j 主模块：提供文档加载、分割、InMemoryEmbeddingStore 等 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j</artifactId>
+            <!-- langchain4j 主模块使用稳定版（milvus/其它 beta 模块的父依赖） -->
+            <version>1.17.0</version>
+        </dependency>
+
+        <!-- milvus 向量数据库客户端 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-milvus</artifactId>
+        </dependency>
     </dependencies>
 
 </project>

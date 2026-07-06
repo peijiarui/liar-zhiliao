@@ -12,12 +12,13 @@ import reactor.core.publisher.Flux;
  * @since 2026-06-30
  */
 @AiService(wiringMode = AiServiceWiringMode.EXPLICIT,
-        chatModel = "openAiChatModel",
-        streamingChatModel = "openAiStreamingChatModel",
-        chatMemory = "chatMemory",
-        chatMemoryProvider = "chatMemoryProvider",
-        contentRetriever = "contentRetriever"
+        chatModel = "openAiChatModel",  //非流式调用时使用这个模型
+        streamingChatModel = "openAiStreamingChatModel",    //流式调用时使用这个模型
+        chatMemory = "chatMemory",  //指定会话记忆对象
+        chatMemoryProvider = "chatMemoryProvider",  //指定会话记忆对象提供者
+        contentRetriever = "contentRetriever"   //配置内容检索器
 )
+//@AiService  //不指定wiringMode时会自动配置
 public interface ChatService {
 
     @SystemMessage(fromResource = "system-prompt.md")

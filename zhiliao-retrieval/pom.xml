@@ -13,13 +13,22 @@
     <description>检索服务模块 - 混合检索、Rerank</description>
 
     <dependencies>
+        <!-- 内部模块Common -->
         <dependency>
             <groupId>org.liar.ai</groupId>
             <artifactId>zhiliao-common</artifactId>
         </dependency>
+
+        <!-- easy-rag 用于混合检索 -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-easy-rag</artifactId>
+        </dependency>
+
+        <!-- milvus 向量数据库相关依赖 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-milvus</artifactId>
         </dependency>
     </dependencies>
 
