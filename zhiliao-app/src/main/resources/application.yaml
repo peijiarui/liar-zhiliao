@@ -8,16 +8,16 @@ spring:
     name: liar-zhiliao
   data:
     redis:
-      host: ${resource-server-host}
+      host: ${RESOURCE_SERVER_HOST}
       port: 6379
       password: Pjr@18556720503
   datasource:
-    url: jdbc:postgresql://${resource-server-host}:5432/zhiliao?useUnicode=true&characterEncoding=utf8
+    url: jdbc:postgresql://${RESOURCE_SERVER_HOST}:5432/zhiliao?useUnicode=true&characterEncoding=utf8
     username: peijiarui
     password: Pjr@18556720503
     driver-class-name: org.postgresql.Driver
   rabbitmq:
-    host: ${resource-server-host}
+    host: ${RESOURCE_SERVER_HOST}
     port: 5672
     username: zhiliao
     password: 18556720503
@@ -49,14 +49,14 @@ langchain4j:
       log-requests: true
       log-responses: true
 #  milvus:
-#    host: ${resource-server-host}
+#    host: ${RESOURCE_SERVER_HOST}
 #    port: 19530
 #    collection-name: zhiliao_chunks
 #    username: peijiarui
 #    password: Pjr@18556720503
   community:
     redis:
-      host: ${resource-server-host}
+      host: ${RESOURCE_SERVER_HOST}
       port: 6379
 
 # MyBatis-Plus 配置
@@ -75,7 +75,7 @@ zhiliao:
   retrieval:
     store-type: milvus  # milvus (default) or in-memory
   minio:
-    endpoint: http://${resource-server-host}:9000
+    endpoint: http://${RESOURCE_SERVER_HOST}:9000
     access-key: peijiarui
     secret-key: Pjr@18556720503
     bucket: zhiliao-docs
