@@ -10,17 +10,17 @@ spring:
     redis:
       host: ${RESOURCE_SERVER_HOST}
       port: 6379
-      password: Pjr@18556720503
+      password: ${RESOURCE_SERVER_PASSWORD}
   datasource:
     url: jdbc:postgresql://${RESOURCE_SERVER_HOST}:5432/zhiliao?useUnicode=true&characterEncoding=utf8
     username: peijiarui
-    password: Pjr@18556720503
+    password: ${RESOURCE_SERVER_PASSWORD}
     driver-class-name: org.postgresql.Driver
   rabbitmq:
     host: ${RESOURCE_SERVER_HOST}
     port: 5672
     username: zhiliao
-    password: 18556720503
+    password: ${RESOURCE_SERVER_PASSWORD}
     virtual-host: /
     listener:
       simple:
@@ -53,7 +53,7 @@ langchain4j:
 #    port: 19530
 #    collection-name: zhiliao_chunks
 #    username: peijiarui
-#    password: Pjr@18556720503
+#    password: ${RESOURCE_SERVER_PASSWORD}
   community:
     redis:
       host: ${RESOURCE_SERVER_HOST}
@@ -77,7 +77,7 @@ zhiliao:
   minio:
     endpoint: http://${RESOURCE_SERVER_HOST}:9000
     access-key: peijiarui
-    secret-key: Pjr@18556720503
+    secret-key: ${RESOURCE_SERVER_PASSWORD}
     bucket: zhiliao-docs
   rabbitmq:
     queue: zhiliao.document.process

@@ -1,6 +1,5 @@
 package org.liar.zhiliao.ingestion.config;
 
-import dev.langchain4j.community.store.embedding.redis.RedisEmbeddingStore;
 import dev.langchain4j.data.document.Document;
 import dev.langchain4j.data.document.DocumentSplitter;
 import dev.langchain4j.data.document.loader.ClassPathDocumentLoader;
@@ -36,7 +35,7 @@ public class IngestionConfig {
     /**
      * Langchain4j自动注入的向量存储对象，如果在yaml中配置的话就默认使用
      */
-    private final RedisEmbeddingStore embeddingStore;
+    private final EmbeddingStore<TextSegment> embeddingStore;
 
     /**
      * 创建向量存储对象，用于初始化向量数据库
