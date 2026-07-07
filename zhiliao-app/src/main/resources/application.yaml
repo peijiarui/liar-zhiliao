@@ -46,6 +46,7 @@ langchain4j:
       base-url: https://llm-kyz5903txm3fyz8f.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
       api-key: ${QWEN_API_KEY}
       model-name: text-embedding-v4
+      max-segments-per-batch: 10
       log-requests: true
       log-responses: true
   milvus:
@@ -54,6 +55,7 @@ langchain4j:
     collection-name: zhiliao_chunks
     username: peijiarui
     password: ${RESOURCE_SERVER_PASSWORD}
+    dimension: 1024
 #  community:
 #    redis:
 #      host: ${RESOURCE_SERVER_HOST}

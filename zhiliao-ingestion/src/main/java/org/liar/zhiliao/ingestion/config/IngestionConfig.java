@@ -32,7 +32,7 @@ public class IngestionConfig {
     private final EmbeddingModel embeddingModel;
     private final EmbeddingStore<TextSegment> embeddingStore;
 
-    @PostConstruct
+//    @PostConstruct
     public void init() {
         // 1. 加载文件进内存
         List<Document> docs = ClassPathDocumentLoader.loadDocuments("docs/");
