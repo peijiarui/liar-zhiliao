@@ -1,6 +1,6 @@
 package org.liar.zhiliao.auth.service;
 
-import org.liar.zhiliao.auth.model.User;
+import org.liar.zhiliao.auth.entity.User;
 
 /**
  * @author Pei

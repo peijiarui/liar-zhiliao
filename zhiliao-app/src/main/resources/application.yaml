@@ -19,7 +19,7 @@ spring:
   rabbitmq:
     host: ${RESOURCE_SERVER_HOST}
     port: 5672
-    username: zhiliao
+    username: peijiarui
     password: ${RESOURCE_SERVER_PASSWORD}
     virtual-host: /
     listener:

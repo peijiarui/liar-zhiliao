@@ -1,12 +1,10 @@
-package org.liar.zhiliao.ingestion.model;
+package org.liar.zhiliao.ingestion.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.*;
 import java.time.OffsetDateTime;
 
-@Getter
-@Setter
-@ToString
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

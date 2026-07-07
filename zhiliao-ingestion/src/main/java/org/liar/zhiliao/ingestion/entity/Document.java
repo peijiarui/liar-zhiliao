@@ -1,12 +1,15 @@
-package org.liar.zhiliao.ingestion.model;
+package org.liar.zhiliao.ingestion.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.liar.zhiliao.ingestion.enums.DocumentStatusEnum;
+
 import java.time.OffsetDateTime;
 
-@Getter
-@Setter
-@ToString
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -24,7 +27,7 @@ public class Document {
 
     @TableField
     @Builder.Default
-    private String status = "UPLOADED";
+    private String status = DocumentStatusEnum.UPLOADED.getStatus();
 
     private String minioKey;
 

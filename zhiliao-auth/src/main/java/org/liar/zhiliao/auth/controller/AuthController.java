@@ -2,7 +2,7 @@ package org.liar.zhiliao.auth.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.liar.zhiliao.auth.model.User;
+import org.liar.zhiliao.auth.entity.User;
 import org.liar.zhiliao.auth.service.UserService;
 import org.liar.zhiliao.common.model.CurrentUser;
 import org.liar.zhiliao.common.utils.JwtUtil;

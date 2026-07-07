@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import java.io.InputStream;
 
 @Service
-public class TikaDocumentParser implements DocumentParser {
+public class TikaDocumentParserImpl implements DocumentParser {
 
     private final Tika tika = new Tika();
 

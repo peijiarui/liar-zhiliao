@@ -1,10 +1,12 @@
 package org.liar.zhiliao.ingestion.config;
 
 import io.minio.MinioClient;
+import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+@Getter
 @Configuration
 public class MinIOConfig {
 
@@ -28,7 +30,4 @@ public class MinIOConfig {
                 .build();
     }
 
-    public String getBucket() {
-        return bucket;
-    }
 }

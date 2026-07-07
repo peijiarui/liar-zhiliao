@@ -483,7 +483,7 @@ public record DocumentRecord(
 `zhiliao-ingestion/src/main/java/.../repository/DocumentRepository.java`:
 
 ```java
-package org.liar.zhiliao.ingestion.repository;
+package org.liar.zhiliao.ingestion.mapper;
 
 import lombok.RequiredArgsConstructor;
 import org.liar.zhiliao.ingestion.entity.DocumentRecord;
@@ -491,7 +491,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Repository;
 
-import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -980,7 +979,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.liar.zhiliao.ingestion.entity.DocumentRecord;
-import org.liar.zhiliao.ingestion.repository.DocumentRepository;
+import org.liar.zhiliao.ingestion.mapper.DocumentRepository;
 import org.liar.zhiliao.ingestion.service.DocumentParser;
 import org.liar.zhiliao.ingestion.service.DocumentProcessor;
 import org.liar.zhiliao.ingestion.service.DocumentSplitter;
@@ -1156,7 +1155,7 @@ package org.liar.zhiliao.ingestion.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.liar.zhiliao.ingestion.entity.DocumentRecord;
-import org.liar.zhiliao.ingestion.repository.DocumentRepository;
+import org.liar.zhiliao.ingestion.mapper.DocumentRepository;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
