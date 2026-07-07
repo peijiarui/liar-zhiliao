@@ -485,7 +485,7 @@ Spring Cache + Caffeine + Redis，通过 `@Cacheable` 注解声明式缓存，Mi
 | Embedding 选型 | 中英文混合、延迟、成本 | BGE-M3 本地部署（生产），API（MVP）|
 | 多租户隔离 | 部门间数据隔离+跨部门共享 | 所有存储层注入 tenant_id，ThreadLocal 透传 |
 | LLM 幻觉 | 知识库外的问题编造答案 | Prompt 约束 + 置信度阈值 + 输入/输出过滤 |
-| 知识库更新 | 文档变更后索引同步 | MD5 指纹 + doc→chunk 映射 + 定时对账 |
+| 知识库更新 | 文档变更后索引同步 | MD5 指纹 + doc→zlChunk 映射 + 定时对账 |
 | 大文档处理 | 50MB+ PDF 阻塞 HTTP 请求 | RabbitMQ 异步 + Worker 水平扩展 |
 
 ---

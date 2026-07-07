@@ -48,16 +48,16 @@ langchain4j:
       model-name: text-embedding-v4
       log-requests: true
       log-responses: true
-#  milvus:
-#    host: ${RESOURCE_SERVER_HOST}
-#    port: 19530
-#    collection-name: zhiliao_chunks
-#    username: peijiarui
-#    password: ${RESOURCE_SERVER_PASSWORD}
-  community:
-    redis:
-      host: ${RESOURCE_SERVER_HOST}
-      port: 6379
+  milvus:
+    host: ${RESOURCE_SERVER_HOST}
+    port: 19530
+    collection-name: zhiliao_chunks
+    username: peijiarui
+    password: ${RESOURCE_SERVER_PASSWORD}
+#  community:
+#    redis:
+#      host: ${RESOURCE_SERVER_HOST}
+#      port: 6379
 
 # MyBatis-Plus 配置
 mybatis-plus:

@@ -1,9 +1,6 @@
 package org.liar.zhiliao.auth.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.*;
 
 import java.time.OffsetDateTime;
@@ -12,7 +9,8 @@ import java.time.OffsetDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class User {
+@TableName("zl_user")
+public class ZlUser {
 
     @TableId(type = IdType.AUTO)
     private Long id;

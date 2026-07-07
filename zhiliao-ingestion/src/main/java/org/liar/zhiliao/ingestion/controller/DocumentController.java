@@ -2,7 +2,7 @@ package org.liar.zhiliao.ingestion.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.liar.zhiliao.ingestion.entity.Document;
+import org.liar.zhiliao.ingestion.entity.ZlDocument;
 import org.liar.zhiliao.ingestion.service.DocumentService;
 import org.liar.zhiliao.ingestion.vo.response.DocumentRespVO;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +21,7 @@ public class DocumentController {
     public ResponseEntity<?> upload(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "kbId", defaultValue = "1") Long kbId) {
-        Document doc = documentService.upload(file, kbId);
+        ZlDocument doc = documentService.upload(file, kbId);
         log.info("Document uploaded: id={}, fileName={}, status={}",
                 doc.getId(), doc.getFileName(), doc.getStatus());
         return ResponseEntity.ok(
@@ -35,7 +35,7 @@ public class DocumentController {
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getDocument(@PathVariable Long id) {
-        Document doc = documentService.getDocument(id);
+        ZlDocument doc = documentService.getDocument(id);
         return ResponseEntity.ok(
                 DocumentRespVO.builder()
                         .id(doc.getId())

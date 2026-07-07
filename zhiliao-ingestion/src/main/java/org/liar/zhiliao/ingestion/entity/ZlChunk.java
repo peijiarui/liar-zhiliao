@@ -8,8 +8,8 @@ import java.time.OffsetDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@TableName("chunks")
-public class Chunk {
+@TableName("zl_chunk")
+public class ZlChunk {
 
     @TableId(type = IdType.AUTO)
     private Long id;

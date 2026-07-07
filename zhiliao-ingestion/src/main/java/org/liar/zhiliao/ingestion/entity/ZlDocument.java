@@ -13,8 +13,8 @@ import java.time.OffsetDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@TableName("documents")
-public class Document {
+@TableName("zl_document")
+public class ZlDocument {
 
     @TableId(type = IdType.AUTO)
     private Long id;

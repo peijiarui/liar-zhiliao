@@ -7,8 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.liar.zhiliao.ingestion.config.MinIOConfig;
 import org.liar.zhiliao.ingestion.config.RabbitMQConfig;
-import org.liar.zhiliao.ingestion.entity.Document;
-import org.liar.zhiliao.ingestion.mapper.DocumentMapper;
+import org.liar.zhiliao.ingestion.entity.ZlDocument;
+import org.liar.zhiliao.ingestion.mapper.ZlDocumentMapper;
 import org.liar.zhiliao.ingestion.model.DocumentMessage;
 import org.liar.zhiliao.ingestion.service.DocumentService;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -30,10 +30,10 @@ public class DocumentServiceImpl implements DocumentService {
 
     private final MinioClient minioClient;
     private final MinIOConfig minIOConfig;
-    private final DocumentMapper documentMapper;
+    private final ZlDocumentMapper documentMapper;
     private final RabbitTemplate rabbitTemplate;
 
-    public Document upload(MultipartFile file, Long kbId) {
+    public ZlDocument upload(MultipartFile file, Long kbId) {
         // 1. Compute MD5
         String fileMd5;
         try {
@@ -58,7 +58,7 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         // 4. Create document record
-        Document doc = Document.builder()
+        ZlDocument doc = ZlDocument.builder()
                 .kbId(kbId)
                 .fileName(file.getOriginalFilename())
                 .fileType(file.getContentType())
@@ -81,7 +81,7 @@ public class DocumentServiceImpl implements DocumentService {
         return doc;
     }
 
-    public Document getDocument(Long id) {
+    public ZlDocument getDocument(Long id) {
         return documentMapper.selectById(id);
     }
 
