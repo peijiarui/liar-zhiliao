@@ -34,7 +34,7 @@ public class RetrievalConfig {
     /**
      * 默认的内容检索器（Milvus），使用 MilvusEmbeddingStore 进行检索。
      */
-//    @Bean("contentRetriever")
+    @Bean("contentRetriever")
 //    @Primary
 //    @ConditionalOnProperty(name = "zhiliao.retrieval.store-type", havingValue = "milvus", matchIfMissing = true)
     public ContentRetriever milvusContentRetriever() {
@@ -50,8 +50,8 @@ public class RetrievalConfig {
     /**
      * 备选的内容检索器（In-Memory），用于本地开发/测试。
      */
-    @Bean("contentRetriever")
-    @ConditionalOnProperty(name = "zhiliao.retrieval.store-type", havingValue = "in-memory")
+//    @Bean("contentRetriever")
+//    @ConditionalOnProperty(name = "zhiliao.retrieval.store-type", havingValue = "in-memory")
     public ContentRetriever inMemoryContentRetriever() {
         log.info("Initializing In-Memory ContentRetriever (minScore=0.5, maxResults=3)");
         return EmbeddingStoreContentRetriever.builder()
