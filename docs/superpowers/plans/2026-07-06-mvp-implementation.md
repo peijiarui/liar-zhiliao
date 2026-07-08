@@ -85,7 +85,7 @@ Phase 4 - 对话增强 + JWT:
 - Create: `zhiliao-app/src/main/resources/sql/data.sql`
 - Modify: `zhiliao-app/src/main/resources/application.yaml`
 
-- [ ] **Step 1: 创建 Docker Compose 配置文件**
+- [x] **Step 1: 创建 Docker Compose 配置文件**
 
 `docker/local-dev.yml`:
 
@@ -167,7 +167,7 @@ volumes:
   milvusdata:
 ```
 
-- [ ] **Step 2: 创建数据库 DDL**
+- [x] **Step 2: 创建数据库 DDL**
 
 `zhiliao-app/src/main/resources/sql/schema.sql`:
 
@@ -252,7 +252,7 @@ CREATE INDEX idx_chunks_doc_id ON chunks(doc_id);
 CREATE INDEX idx_conversations_memory_id ON conversations(memory_id);
 ```
 
-- [ ] **Step 3: 创建种子数据**
+- [x] **Step 3: 创建种子数据**
 
 `zhiliao-app/src/main/resources/sql/data.sql`:
 
@@ -269,7 +269,7 @@ INSERT INTO knowledge_bases (id, name, description) VALUES
     (1, '公司知识库', '默认知识库');
 ```
 
-- [ ] **Step 4: 更新 application.yaml**
+- [x] **Step 4: 更新 application.yaml**
 
 `zhiliao-app/src/main/resources/application.yaml`:
 
@@ -440,15 +440,15 @@ public interface DocumentSplitter {
 - Verify: `zhiliao-ingestion/.../consumer/DocumentConsumer.java`
 - **Modify:** `zhiliao-ingestion/.../consumer/DocumentConsumerProcessor.java` (补全 TODO 逻辑)
 
-- [ ] **Step 1: 确认 RabbitMQConfig**
+- [x] **Step 1: 确认 RabbitMQConfig**
 
 已存在声明 Exchange(`zhiliao.direct`)、Queue(`zhiliao.document.process`)、Binding。
 
-- [ ] **Step 2: 确认 DocumentConsumer**
+- [x] **Step 2: 确认 DocumentConsumer**
 
 已存在 `@RabbitListener` 监听，接收 `DocumentMessage` 并调用 `DocumentConsumerProcessor.process()`。
 
-- [ ] **Step 3: 补全 DocumentConsumerProcessor**
+- [x] **Step 3: 补全 DocumentConsumerProcessor**
 
 目前 `process()` 方法体为 TODO 注释状态。需补全完整流程：
 
@@ -556,7 +556,7 @@ public class DocumentConsumerProcessor {
 - **Delete (注释块):** `zhiliao-retrieval/.../config/MilvusConfig.java`
 - **Keep:** `zhiliao-retrieval/.../config/RetrievalConfig.java`
 
-- [ ] **Step 1: 删除已注释的旧接口和实现类**
+- [x] **Step 1: 删除已注释的旧接口和实现类**
 
 ```
 zhiliao-retrieval/src/main/java/.../service/
@@ -572,7 +572,7 @@ zhiliao-retrieval/src/main/java/.../config/
   └── MilvusConfig.java              ← 删除（全部注释掉，LangChain4j 自动装配替代）
 ```
 
-- [ ] **Step 2: 确认唯一的活跃类—RetrievalConfig**
+- [x] **Step 2: 确认唯一的活跃类—RetrievalConfig**
 
 ```java
 package org.liar.zhiliao.retrieval.config;
@@ -635,7 +635,7 @@ public class RetrievalConfig {
         contentRetriever = "contentRetriever")
 ```
 
-- [ ] **Step 1: 确认 System Prompt 包含引用溯源指令**
+- [x] **Step 1: 确认 System Prompt 包含引用溯源指令**
 
 `system-prompt.md`：
 ```markdown
@@ -697,7 +697,7 @@ public interface UserService {
 
 ### Task 10: 端到端验证
 
-- [ ] **Step 1: 启动基础设施**
+- [x] **Step 1: 启动基础设施**
 
 ```bash
 docker compose -f docker/local-dev.yml up -d
@@ -705,21 +705,21 @@ docker compose -f docker/local-dev.yml up -d
 
 验证各服务健康状态。
 
-- [ ] **Step 2: 启动应用**
+- [x] **Step 2: 启动应用**
 
 ```bash
 DEEPSEEK_API_KEY=your_key QWEN_API_KEY=your_key RESOURCE_SERVER_HOST=localhost RESOURCE_SERVER_PASSWORD=your_password mvn spring-boot:run -pl zhiliao-app
 ```
 
-- [ ] **Step 3: 登录获取 Token**
+- [x] **Step 3: 登录获取 Token**
 
 ```bash
 curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"123456"}'
+  -d '{"username":"admin","password":"admin123"}'
 ```
 
-- [ ] **Step 4: 上传文档**
+- [x] **Step 4: 上传文档**
 
 ```bash
 curl -X POST http://localhost:8080/api/documents/upload \
@@ -728,14 +728,14 @@ curl -X POST http://localhost:8080/api/documents/upload \
   -F "kbId=1"
 ```
 
-- [ ] **Step 5: 查询文档状态**
+- [x] **Step 5: 查询文档状态**
 
 ```bash
 curl http://localhost:8080/api/documents/1 \
   -H "Authorization: Bearer <token>"
 ```
 
-- [ ] **Step 6: 对话测试**
+- [x] **Step 6: 对话测试**
 
 ```bash
 curl "http://localhost:8080/chat/chat?memoryId=test1&message=文档里说了什么" \

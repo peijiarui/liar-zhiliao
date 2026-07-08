@@ -1,6 +1,6 @@
 package org.liar.zhiliao.auth.service;
 
-import org.liar.zhiliao.auth.entity.ZlUser;
+import org.liar.zhiliao.auth.entity.SysUser;
 
 /**
  * @author Pei
@@ -8,6 +8,6 @@ import org.liar.zhiliao.auth.entity.ZlUser;
  */
 public interface UserService {
 
-    ZlUser authenticate(String username, String password);
+    SysUser authenticate(String username, String password);
 
 }

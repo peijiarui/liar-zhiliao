@@ -31,10 +31,10 @@
 
 | 阶段 | 模块 | 状态 |
 |------|------|------|
-| Phase 1 | 基础设施（Docker Compose + 数据库 DDL） | 新建 |
-| Phase 2 | 文档摄入 + 向量化（Tika 解析 + Embedding + 双写 PG/Milvus） | 从占位符实现 |
-| Phase 3 | 检索层（Milvus 查询 + ContentRetriever 注入 ChatService） | 从 InMemory 升级 |
-| Phase 4 | 对话增强（Redis 记忆 + 引用溯源 + 置信度拒答） | 在现有雏形上增强 |
+| Phase 1 | 基础设施（Docker Compose + 数据库 DDL） | 完成 |
+| Phase 2 | 文档摄入 + 向量化（Tika 解析 + Embedding + 双写 PG/Milvus） | 完成 |
+| Phase 3 | 检索层（Milvus 查询 + EmbeddingQueryRouter + ContentRetriever 注入 ChatService） | 完成 |
+| Phase 4 | 对话增强（Redis 记忆 + 引用溯源 + 置信度拒答 + JWT 鉴权） | 完成 |
 
 ### 1.4 延后范围
 
@@ -67,13 +67,13 @@
 
 | 表 | 关键字段 | MVP 使用情况 |
 |----|----------|-------------|
-| `users` | id, username, password_hash, dept_id, role, created_at | 写入测试用户 |
-| `departments` | id, name, parent_id | 写入默认部门 |
-| `knowledge_bases` | id, name, description, tenant_id, created_at | 使用 |
-| `documents` | id, kb_id, file_name, file_type, status, minio_key, file_size, md5, chunk_count, created_at | 使用 |
-| `chunks` | id, doc_id, content, embedding_id, metadata, created_at | 使用（PG + Milvus 双写）|
-| `conversations` | id, memory_id, user_id, title, message_count, created_at | 使用 |
-| `audit_logs` | id, user_id, action, target_type, target_id, detail, created_at | 写入 |
+| `sys_user` | id, username, password_hash, dept_id, role, created_at | 写入测试用户 |
+| `sys_department` | id, name, parent_id | 写入默认部门 |
+| `zl_knowledge_base` | id, name, description, tenant_id, created_at | 使用 |
+| `zl_document` | id, kb_id, file_name, file_type, status, minio_key, file_size, md5, chunk_count, created_at | 使用 |
+| `zl_chunk` | id, doc_id, content, embedding_id, metadata, created_at | 使用（PG + Milvus 双写）|
+| `zl_conversation` | id, memory_id, user_id, title, message_count, created_at | 使用 |
+| `zl_audit_log` | id, user_id, action, target_type, target_id, detail, created_at | 写入 |
 
 - 所有表带 `tenant_id` / `dept_id` 列，MVP 阶段填入 `"default"` / `1`
 - DDL 使用 SQL 文件管理（`schema.sql` + `data.sql`）
@@ -90,7 +90,7 @@
 **数据映射关系：**
 
 ```
-PG chunks 表：    id | doc_id | content | metadata | embedding_id | created_at
+PG zl_chunk 表：   id | doc_id | content | metadata | embedding_id | created_at
                       ↑            ↑          ↑           ↓
 Milvus：              doc_id   content   metadata   vector_id
 ```
@@ -111,7 +111,7 @@ Tika 解析 → 分割 chunks → Embedding → 写入 Milvus（返回 vector_id
 
 ### 2.4 输出物
 
-- `docker/local-dev.yml`
+- `docker/local-dev.yml`（Milvus 使用 standalone 模式：独立 etcd + MinIO，非嵌入式）
 - `zhiliao-app/src/main/resources/sql/schema.sql`（DDL）
 - `zhiliao-app/src/main/resources/sql/data.sql`（测试种子数据）
 
@@ -160,13 +160,13 @@ zhiliao-ingestion/
 ├── controller/
 │   └── DocumentController.java        # POST /api/documents/upload, GET /api/documents/{id}
 ├── entity/
-│   ├── Document.java                  # MyBatis-Plus @TableName("documents") 实体
-│   └── Chunk.java                     # MyBatis-Plus @TableName("chunks") 实体
+│   ├── ZlDocument.java                # MyBatis-Plus @TableName("zl_document") 实体
+│   └── ZlChunk.java                   # MyBatis-Plus @TableName("zl_chunk") 实体
 ├── enums/
 │   └── DocumentStatusEnum.java        # UPLOADED / PROCESSING / COMPLETED / FAILED
 ├── mapper/
-│   ├── DocumentMapper.java            # extends BaseMapper<Document>
-│   └── ChunkMapper.java               # extends BaseMapper<Chunk>
+│   ├── ZlDocumentMapper.java          # extends BaseMapper<ZlDocument>
+│   └── ZlChunkMapper.java             # extends BaseMapper<ZlChunk>
 ├── model/
 │   └── DocumentMessage.java           # RabbitMQ 消息 POJO
 ├── service/
@@ -198,7 +198,7 @@ zhiliao-retrieval/
 ```
 DocumentController
   → DocumentService (接口/impl)
-    → DocumentMapper (MyBatis-Plus)
+    → ZlDocumentMapper (MyBatis-Plus)
     → MinioClient (MinIO)
     → RabbitTemplate (消息投递)
 
@@ -209,8 +209,8 @@ DocumentConsumer (RabbitMQ 监听)
     → DocumentSplitter → 递归分割
     → EmbeddingModel (LangChain4j) → 向量化
     → EmbeddingStore (LangChain4j/Milvus) → 向量写入
-    → ChunkMapper (MyBatis-Plus) → PG 写入
-    → DocumentMapper (MyBatis-Plus) → 状态更新
+    → ZlChunkMapper (MyBatis-Plus) → PG 写入
+    → ZlDocumentMapper (MyBatis-Plus) → 状态更新
 ```
 
 ### 3.4 预留扩展点
@@ -252,18 +252,28 @@ UPLOADED → PROCESSING → COMPLETED
 
 ```
 用户问题 → EmbeddingModel (LangChain4j) → 向量
-  → EmbeddingStore (Milvus) → HNSW, COSINE, Top-5
-  → EmbeddingStoreContentRetriever（minScore=0.5, maxResults=5）
-  → 注入 ChatService（@AiService contentRetriever = "contentRetriever"）
+  → EmbeddingQueryRouter
+    → 计算与闲聊/知识质心的余弦相似度
+    → 闲聊（sim > 0.78 + 偏向闲聊）→ EmptyContentRetriever（跳过 RAG）
+    → 知识类 → EmbeddingStoreContentRetriever（Milvus, HNSW, COSINE, Top-5, minScore=0.5）
+  → 注入 ChatService（@AiService retrievalAugmentor = "retrievalAugmentor"）
 ```
 
 具体配置在 `RetrievalConfig.java`：
 
 ```java
-// 使用 LangChain4j EmbeddingStoreContentRetriever
-// minScore=0.5: 低于此分数的结果不返回
-// maxResults=5: 最多返回 5 个相关片段
-// EmbeddingModel 和 EmbeddingStore 由 langchain4j-milvus-spring-boot-starter 自动装配
+// EmbeddingQueryRouter：基于质心相似度的意图路由
+//   从 sys_routing_seed 表加载种子（降级到内置默认值）
+//   计算 chat/knowledge 两类质心 embedding
+//   运行时判断用户意图，路由到不同检索器
+
+// EmbeddingStoreContentRetriever（知识检索）：
+//   minScore=0.5: 低于此分数的结果不返回
+//   maxResults=5: 最多返回 5 个相关片段
+//   EmbeddingModel 和 EmbeddingStore 由 langchain4j-milvus-spring-boot-starter 自动装配
+
+// EmptyContentRetriever（闲聊）：
+//   直接返回空结果，跳过 RAG 检索
 ```
 
 ### 4.2 模块文件结构
@@ -271,8 +281,15 @@ UPLOADED → PROCESSING → COMPLETED
 ```
 zhiliao-retrieval/
 ├── config/
-│   ├── RetrievalConfig.java           # 声明 contentRetriever Bean
-│   └── RetrievalProperties.java       # zhiliao.retrieval.* 配置属性（可选）
+│   └── RetrievalConfig.java           # contentRetriever + emptyContentRetriever + EmbeddingQueryRouter + retrievalAugmentor Bean
+├── entity/
+│   └── SysRoutingSeed.java            # 路由种子实体（MyBatis-Plus）
+├── mapper/
+│   └── SysRoutingSeedMapper.java       # BaseMapper<SysRoutingSeed>
+├── retriever/
+│   └── EmptyContentRetriever.java     # 空检索器（闲聊时跳过 RAG）
+└── router/
+    └── EmbeddingQueryRouter.java      # QueryRouter 实现，基于质心相似度路由
 ```
 
 > 检索模块采用 LangChain4j 内置机制：`EmbeddingStoreContentRetriever` 封装了向量检索逻辑，直接注入 ChatService。无需自定义 EmbeddingService、VectorStore 或 Retriever 接口。
@@ -290,8 +307,10 @@ zhiliao-retrieval/
 ### 4.4 预留扩展点
 
 ```java
-// ContentRetriever 扩展（通过 RetrievalConfig 切换）
-// MVP：EmbeddingStoreContentRetriever（纯向量检索，Cosine 相似度，Top-5，minScore=0.5）
+// QueryRouter 扩展（通过 RetrievalConfig 切换）
+// MVP：EmbeddingQueryRouter（基于质心相似度的意图路由）
+//       知识类 → EmbeddingStoreContentRetriever（纯向量检索，Cosine 相似度，Top-5，minScore=0.5）
+//       闲聊类 → EmptyContentRetriever（跳过 RAG）
 // 未来：HybridRetriever（Milvus 稠密 + ES 稀疏 BM25 + RRF 融合）
 //       RerankedRetriever（BGE-Reranker 精排，Top-30 → Top-5）
 // 通过装饰器模式组合：
@@ -352,6 +371,7 @@ zhiliao-chat/
     └── ChatService.java              # @AiService 接口
                                       # @SystemMessage(fromResource = "system-prompt.md")
                                       # Flux<String> chat(@MemoryId, @UserMessage)
+                                      # retrievalAugmentor = "retrievalAugmentor"
 ```
 
 ## 6. 轻量 JWT 方案
@@ -366,32 +386,34 @@ zhiliao-chat/
 |----|------|------|
 | `CurrentUser` (record) | zhiliao-common (`model` 包) | `{ Long id, String username, Long deptId }` |
 | `UserContextHolder` | zhiliao-common | ThreadLocal，`set/get/clear` 当前用户 |
-| `JwtUtil` | zhiliao-common | JJWT 签发/解析/验证（HMAC-SHA256）|
+| `JwtUtil` | zhiliao-common | JJWT 签发/解析/验证（HMAC-SHA256），含默认 secret/expiration |
 | `JwtFilter` | zhiliao-auth | `Filter`，从 `Authorization: Bearer <token>` 解析用户 |
 | `SecurityConfig` | zhiliao-auth | `PasswordEncoder` Bean（BCryptPasswordEncoder）|
 | `AuthController` | zhiliao-auth | `POST /api/auth/login` |
-| `UserService` | zhiliao-auth | 接口 + `UserServiceImpl`（MyBatis-Plus UserMapper） |
-| `UserMapper` | zhiliao-auth | MyBatis-Plus `BaseMapper<User>` |
-| `User` | zhiliao-auth | MyBatis-Plus 实体 |
+| `UserService` | zhiliao-auth | 接口 + `UserServiceImpl`（MyBatis-Plus SysUserMapper） |
+| `SysUserMapper` | zhiliao-auth | MyBatis-Plus `BaseMapper<SysUser>` |
+| `SysUser` | zhiliao-auth | MyBatis-Plus 实体 |
+| `DataInitializer` | zhiliao-auth | `CommandLineRunner`，启动时校验/更新 BCrypt 密码 hash |
 
 ### 6.3 Auth 模块结构
 
 ```
 zhiliao-auth/
 ├── config/
-│   └── SecurityConfig.java           # @Bean PasswordEncoder (BCrypt)
+│   ├── SecurityConfig.java           # @Bean PasswordEncoder (BCrypt)
+│   └── DataInitializer.java          # CommandLineRunner，启动时校验/更新 BCrypt hash
 ├── controller/
 │   └── AuthController.java           # POST /api/auth/login → { token }
 ├── entity/
-│   └── User.java                     # MyBatis-Plus 实体（@TableName "users"）
+│   └── SysUser.java                  # MyBatis-Plus 实体（@TableName "sys_user"）
 ├── filter/
-│   └── JwtFilter.java                # OncePerRequestFilter, 解析 Bearer Token
+│   └── JwtFilter.java                # Filter, @Order(1), 解析 Bearer Token
 ├── mapper/
-│   └── UserMapper.java               # extends BaseMapper<User>
+│   └── SysUserMapper.java            # extends BaseMapper<SysUser>
 ├── service/
 │   ├── UserService.java              # 接口：authenticate(username, password)
 │   └── impl/
-│       └── UserServiceImpl.java      # UserMapper.selectOne → BCrypt 校验
+│       └── UserServiceImpl.java      # SysUserMapper.selectOne → BCrypt 校验
 ```
 
 ### 6.4 登录流程
@@ -431,7 +453,7 @@ Body: { "username": "admin", "password": "123456" }
 
 | 用户名 | 密码 | 部门 |
 |--------|------|------|
-| admin | 123456 | 技术部 |
+| admin | admin123 | 技术部 |
 | zhangsan | 123456 | 产品部 |
 | lisi | 123456 | 运营部 |
 
@@ -442,8 +464,9 @@ zhiliao-common（CurrentUser, UserContextHolder, JwtUtil, AiModelConstants, Loca
     ├── zhiliao-ingestion（依赖 common + retrieval + MyBatis-Plus + RabbitMQ + MinIO + Tika）
     ├── zhiliao-retrieval（依赖 common + langchain4j-milvus-spring-boot-starter）
     │       └── zhiliao-chat（依赖 retrieval + common + langchain4j-open-ai + Redis）
+    │               注入 retrievalAugmentor（含 EmbeddingQueryRouter + ContentRetriever）
     └── zhiliao-auth（依赖 common + MyBatis-Plus + spring-security-crypto）
-            └── JwtFilter 被组件扫描自动注册
+            └── JwtFilter 被 @Component 自动注册
 
 zhiliao-app（启动入口，引入所有模块）
 ```
@@ -467,8 +490,8 @@ zhiliao-app（启动入口，引入所有模块）
 
 | 序号 | 任务 | 产出 |
 |------|------|------|
-| 1.1 | 编写 Docker Compose 配置文件 | `docker/local-dev.yml` |
-| 1.2 | 编写数据库 DDL + 种子数据 | `schema.sql` + `data.sql` |
+| 1.1 | 编写 Docker Compose 配置文件 | `docker/local-dev.yml`（Milvus standard mode: etcd + minio + milvus）|
+| 1.2 | 编写数据库 DDL + 种子数据 | `schema.sql`（sys_/zl_ 前缀表名）+ `data.sql` |
 | 1.3 | 在 zhiliao-app 中配置多数据源连接 | `application.yaml` 更新 |
 | 1.4 | 验证各服务可用性 | 启动脚本 + 健康检查 |
 
@@ -478,12 +501,12 @@ zhiliao-app（启动入口，引入所有模块）
 
 | 序号 | 任务 | 产出 |
 |------|------|------|
-| 2.1 | zhiliao-ingestion 模块依赖 + MyBatis-Plus 实体 | pom.xml, Document.java/Chunk.java/Enums/Mapper |
+| 2.1 | zhiliao-ingestion 模块依赖 + MyBatis-Plus 实体 | pom.xml, ZlDocument.java/ZlChunk.java/DocumentStatusEnum/Mapper |
 | 2.2 | MinIO 集成（配置 + 客户端 Bean + 上传实现） | MinIOConfig.java, DocumentServiceImpl.java |
 | 2.3 | Tika 文档解析 | TikaDocumentParserImpl.java |
 | 2.4 | 文档分割 | RecursiveDocumentSplitterImpl.java |
 | 2.5 | RabbitMQ 配置 + 异步消费者 | RabbitMQConfig.java, DocumentConsumer.java |
-| 2.6 | DocumentConsumerProcessor（编排写入流程）| 解析→分割→Embedding→Milvus→PG |
+| 2.6 | DocumentConsumerProcessor（编排写入流程）| 解析→分割→Embedding→Milvus→PG（已完整实现）|
 | 2.7 | DocumentController + 端到端联调 | 完整 Pipeline |
 
 ### 8.3 Phase 3：检索层 — 查询（第 5-6 周）
@@ -492,8 +515,9 @@ zhiliao-app（启动入口，引入所有模块）
 
 | 序号 | 任务 | 产出 |
 |------|------|------|
-| 3.1 | 升级 RetrievalConfig（InMemory → Milvus）| EmbeddingStoreContentRetriever 配置 |
-| 3.2 | 验证 ContentRetriever 注入 ChatService | 端到端 RAG 对话 |
+| 3.1 | 升级 RetrievalConfig（InMemory → Milvus + QueryRouter）| EmbeddingQueryRouter + ContentRetriever + EmptyContentRetriever |
+| 3.2 | 路由种子表 + 实体 + Mapper | SysRoutingSeed, SysRoutingSeedMapper |
+| 3.3 | 验证 retrievalAugmentor 注入 ChatService | 端到端 RAG 对话（含闲聊/知识自动路由）|
 
 ### 8.4 Phase 4：对话增强 + JWT（第 6-8 周）
 
@@ -502,11 +526,12 @@ zhiliao-app（启动入口，引入所有模块）
 | 序号 | 任务 | 产出 |
 |------|------|------|
 | 4.1 | Redis ChatMemoryStore | 替换本地文件存储 |
-| 4.2 | 引用溯源（System Prompt 更新）| 答案带来源标注 |
+| 4.2 | 引用溯源（System Prompt 更新）| 答案带来源标注 + 知识/闲聊双模式 |
 | 4.3 | 置信度拒答（minScore 配置）| 低置信度拒绝回答 |
 | 4.4 | JWT 工具类 + UserContextHolder | zhiliao-common |
 | 4.5 | JwtFilter + AuthController | 登录 + 鉴权 |
-| 4.6 | 端到端联调 | 上传文档 → 搜索 → 对话 |
+| 4.6 | DataInitializer（启动时 BCrypt 校验）| CommandLineRunner 自动同步密码 |
+| 4.7 | 端到端联调 | 上传文档 → 检索 → 对话 |
 
 ## 9. 关键决策记录
 
