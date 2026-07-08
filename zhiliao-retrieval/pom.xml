@@ -19,16 +19,23 @@
             <artifactId>zhiliao-common</artifactId>
         </dependency>
 
-        <!-- easy-rag 用于混合检索 -->
-        <dependency>
-            <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-easy-rag</artifactId>
-        </dependency>
-
         <!-- milvus 向量数据库相关依赖 -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-milvus-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- MyBatis-Plus：用于查询路由种子等配置 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+        </dependency>
+
+        <!-- PostgreSQL -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
 

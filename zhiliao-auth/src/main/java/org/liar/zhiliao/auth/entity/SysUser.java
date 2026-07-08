@@ -9,8 +9,8 @@ import java.time.OffsetDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@TableName("zl_user")
-public class ZlUser {
+@TableName("sys_user")
+public class SysUser {
 
     @TableId(type = IdType.AUTO)
     private Long id;

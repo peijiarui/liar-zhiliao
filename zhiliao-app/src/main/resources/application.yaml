@@ -55,7 +55,7 @@ langchain4j:
     collection-name: zhiliao_chunks
     username: peijiarui
     password: ${RESOURCE_SERVER_PASSWORD}
-    dimension: 1024
+#    dimension: 1024
 #  community:
 #    redis:
 #      host: ${RESOURCE_SERVER_HOST}

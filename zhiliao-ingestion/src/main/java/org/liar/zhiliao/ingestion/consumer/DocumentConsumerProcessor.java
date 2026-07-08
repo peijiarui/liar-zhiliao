@@ -17,6 +17,7 @@ import org.liar.zhiliao.ingestion.mapper.ZlDocumentMapper;
 import org.liar.zhiliao.ingestion.model.DocumentMessage;
 import org.liar.zhiliao.ingestion.service.DocumentParser;
 import org.liar.zhiliao.ingestion.service.DocumentSplitter;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.List;
 @AllArgsConstructor
 public class DocumentConsumerProcessor {
 
+    private ApplicationContext context;
     private final MinioClient minioClient;
     private final MinIOConfig minIOConfig;
     private final DocumentParser documentParser;
@@ -33,7 +35,7 @@ public class DocumentConsumerProcessor {
     private final ZlDocumentMapper documentMapper;
     private final ZlChunkMapper chunkMapper;
     private final EmbeddingModel embeddingModel;
-    private final EmbeddingStore<TextSegment> embeddingStore;
+    private final EmbeddingStore<TextSegment> milvusEmbeddingStore;
 
     public void process(DocumentMessage message) {
         Long documentId = message.getDocumentId();
@@ -68,7 +70,9 @@ public class DocumentConsumerProcessor {
             List<Embedding> embeddings = embeddingModel.embedAll(segments).content();
 
             // 6. Store vectors in Milvus via LangChain4j EmbeddingStore
-            List<String> vectorIds = embeddingStore.addAll(embeddings, segments);
+            log.info("embeddingStore class: {}", milvusEmbeddingStore.getClass().getName());
+            List<String> vectorIds = milvusEmbeddingStore.addAll(embeddings, segments);
+            log.info("addAll returned {} vector IDs: {}", vectorIds.size(), vectorIds);
 
             // 7. Save chunks to PG via MyBatis-Plus
             for (int i = 0; i < segments.size(); i++) {

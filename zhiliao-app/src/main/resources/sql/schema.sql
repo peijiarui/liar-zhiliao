@@ -12,10 +12,10 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- =============================================================================
 -- Department hierarchy tree. parent_id = NULL means root-level department.
 
-CREATE TABLE IF NOT EXISTS zl_department (
+CREATE TABLE IF NOT EXISTS sys_department (
     id          BIGSERIAL       PRIMARY KEY,
     name        VARCHAR(100)    NOT NULL,
-    parent_id   BIGINT          REFERENCES zl_department(id) ON DELETE RESTRICT,
+    parent_id   BIGINT          ,
     tenant_id   VARCHAR(50)     NOT NULL DEFAULT 'default',
     created_at  TIMESTAMPTZ       DEFAULT NOW(),
     UNIQUE (tenant_id, name)
@@ -24,11 +24,11 @@ CREATE TABLE IF NOT EXISTS zl_department (
 -- 2. Users
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS zl_user (
+CREATE TABLE IF NOT EXISTS sys_user (
     id              BIGSERIAL       PRIMARY KEY,
     username        VARCHAR(50)     NOT NULL UNIQUE,
     password_hash   VARCHAR(255)    NOT NULL,
-    dept_id         BIGINT          NOT NULL DEFAULT 1 REFERENCES zl_department(id) ON DELETE RESTRICT,
+    dept_id         BIGINT          NOT NULL DEFAULT 1,
     role            VARCHAR(20)     NOT NULL DEFAULT 'USER' CHECK (role IN ('USER', 'ADMIN')),
     tenant_id       VARCHAR(50)     NOT NULL DEFAULT 'default',
     created_at      TIMESTAMPTZ       DEFAULT NOW()
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS zl_knowledge_base (
     id          BIGSERIAL       PRIMARY KEY,
     name        VARCHAR(200)    NOT NULL,
     description TEXT,
-    dept_id     BIGINT          NOT NULL DEFAULT 1 REFERENCES zl_department(id) ON DELETE RESTRICT,
+    dept_id     BIGINT          NOT NULL DEFAULT 1 ,
     tenant_id   VARCHAR(50)     NOT NULL DEFAULT 'default',
     created_at  TIMESTAMPTZ       DEFAULT NOW()
 );
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS zl_knowledge_base (
 
 CREATE TABLE IF NOT EXISTS zl_document (
     id          BIGSERIAL       PRIMARY KEY,
-    kb_id       BIGINT          NOT NULL REFERENCES zl_knowledge_base(id) ON DELETE CASCADE,
+    kb_id       BIGINT          NOT NULL ,
     file_name   VARCHAR(255)    NOT NULL,
     file_type   VARCHAR(50),
     status      VARCHAR(20)     NOT NULL DEFAULT 'UPLOADED' CHECK (status IN ('UPLOADED', 'PROCESSING', 'COMPLETED', 'FAILED')),
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS zl_document (
     file_size   BIGINT,
     md5         VARCHAR(32),
     chunk_count INT             DEFAULT 0,
-    dept_id     BIGINT          NOT NULL DEFAULT 1 REFERENCES zl_department(id) ON DELETE RESTRICT,
+    dept_id     BIGINT          NOT NULL DEFAULT 1 ,
     tenant_id   VARCHAR(50)     NOT NULL DEFAULT 'default',
     created_at  TIMESTAMPTZ       DEFAULT NOW()
 );
@@ -69,11 +69,11 @@ CREATE TABLE IF NOT EXISTS zl_document (
 
 CREATE TABLE IF NOT EXISTS zl_chunk (
     id           BIGSERIAL       PRIMARY KEY,
-    doc_id       BIGINT          NOT NULL REFERENCES zl_document(id) ON DELETE CASCADE,
+    doc_id       BIGINT          NOT NULL ,
     content      TEXT            NOT NULL,
     embedding_id VARCHAR(100),
     metadata     JSONB,
-    dept_id      BIGINT          NOT NULL DEFAULT 1 REFERENCES zl_department(id) ON DELETE RESTRICT,
+    dept_id      BIGINT          NOT NULL DEFAULT 1 ,
     tenant_id    VARCHAR(50)     NOT NULL DEFAULT 'default',
     created_at   TIMESTAMPTZ       DEFAULT NOW()
 );
@@ -84,10 +84,10 @@ CREATE TABLE IF NOT EXISTS zl_chunk (
 CREATE TABLE IF NOT EXISTS zl_conversation (
     id              BIGSERIAL       PRIMARY KEY,
     memory_id       VARCHAR(100)    NOT NULL,
-    user_id         BIGINT          REFERENCES zl_user(id) ON DELETE SET NULL,
+    user_id         BIGINT          ,
     title           VARCHAR(200),
     message_count   INT             DEFAULT 0,
-    dept_id         BIGINT          NOT NULL DEFAULT 1 REFERENCES zl_department(id) ON DELETE RESTRICT,
+    dept_id         BIGINT          NOT NULL DEFAULT 1 ,
     tenant_id       VARCHAR(50)     NOT NULL DEFAULT 'default',
     created_at      TIMESTAMPTZ       DEFAULT NOW()
 );
@@ -97,12 +97,12 @@ CREATE TABLE IF NOT EXISTS zl_conversation (
 
 CREATE TABLE IF NOT EXISTS zl_audit_log (
     id          BIGSERIAL       PRIMARY KEY,
-    user_id     BIGINT          REFERENCES zl_user(id) ON DELETE SET NULL,
+    user_id     BIGINT          ,
     action      VARCHAR(100)    NOT NULL,
     target_type VARCHAR(50),
     target_id   BIGINT,
     detail      JSONB,
-    dept_id     BIGINT          NOT NULL DEFAULT 1 REFERENCES zl_department(id) ON DELETE RESTRICT,
+    dept_id     BIGINT          NOT NULL DEFAULT 1 ,
     tenant_id   VARCHAR(50)     NOT NULL DEFAULT 'default',
     created_at  TIMESTAMPTZ       DEFAULT NOW()
 );
@@ -110,9 +110,9 @@ CREATE TABLE IF NOT EXISTS zl_audit_log (
 -- Indexes
 -- =============================================================================
 
--- zl_department
-CREATE INDEX IF NOT EXISTS idx_zl_department_parent_id ON zl_department(parent_id);
-CREATE INDEX IF NOT EXISTS idx_zl_department_tenant_id ON zl_department(tenant_id);
+-- sys_department
+CREATE INDEX IF NOT EXISTS idx_sys_department_parent_id ON sys_department(parent_id);
+CREATE INDEX IF NOT EXISTS idx_sys_department_tenant_id ON sys_department(tenant_id);
 
 -- zl_document
 CREATE INDEX IF NOT EXISTS idx_zl_document_kb_id    ON zl_document(kb_id);
@@ -135,4 +135,4 @@ CREATE INDEX IF NOT EXISTS idx_kb_tenant_dept     ON zl_knowledge_base(tenant_id
 CREATE INDEX IF NOT EXISTS idx_zl_audit_log_tenant_user ON zl_audit_log(tenant_id, user_id);
 
 -- lookup composites
-CREATE INDEX IF NOT EXISTS idx_zl_user_tenant_dept  ON zl_user(tenant_id, dept_id);
+CREATE INDEX IF NOT EXISTS idx_sys_user_tenant_dept  ON sys_user(tenant_id, dept_id);
