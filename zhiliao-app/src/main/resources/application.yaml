@@ -74,8 +74,6 @@ logging:
 
 # zhiliao custom config
 zhiliao:
-  retrieval:
-    store-type: milvus  # milvus (default) or in-memory
   minio:
     endpoint: http://${RESOURCE_SERVER_HOST}:9000
     access-key: peijiarui

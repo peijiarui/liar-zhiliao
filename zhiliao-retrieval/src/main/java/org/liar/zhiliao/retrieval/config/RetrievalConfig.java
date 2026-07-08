@@ -7,18 +7,13 @@ import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
  * 检索配置 - 负责构建内容检索器，为 ChatService 提供 RAG 检索能力。
  * <p>
- * MVP 使用 MilvusEmbeddingStore。可通过 {@code zhiliao.retrieval.store-type} 切换：
- * <ul>
- *   <li>{@code milvus}（默认）- 使用 Milvus 向量数据库</li>
- *   <li>{@code in-memory} - 使用内存向量存储（开发/测试用）</li>
- * </ul>
+ * MVP 使用 MilvusEmbeddingStore。
  *
  * @author Pei
  * @since 2026-07-06
