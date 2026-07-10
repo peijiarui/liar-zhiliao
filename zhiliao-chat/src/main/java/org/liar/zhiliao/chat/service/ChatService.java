@@ -16,7 +16,7 @@ import reactor.core.publisher.Flux;
         streamingChatModel = "openAiStreamingChatModel",    //流式调用时使用这个模型
         chatMemory = "chatMemory",  //指定会话记忆对象
         chatMemoryProvider = "chatMemoryProvider",  //指定会话记忆对象提供者
-        retrievalAugmentor = "retrievalAugmentor"   //装配检索增强器（含 QueryRouter）
+        tools = {"knowledgeRetrievalTool"}  //注册知识检索工具
 )
 //@AiService  //不指定wiringMode时会自动配置
 public interface ChatService {

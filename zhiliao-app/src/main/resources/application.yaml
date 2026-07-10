@@ -2,8 +2,8 @@ server:
   port: 8080
 
 spring:
-#  main:
-#    allow-circular-references: true
+  autoconfigure:
+    exclude: dev.langchain4j.spring.LangChain4jAutoConfig # 排除 LangChain4jAutoConfig，这个自动配置类会似的RagAutoConfig注入COntentRetriever时出现重复导致报错
   application:
     name: liar-zhiliao
   data:
@@ -70,7 +70,7 @@ mybatis-plus:
 logging:
   level:
     dev.langchain4j: debug
-    org.liar.zhiliao.retrieval.router: debug
+    org.liar.zhiliao.retrieval.service: debug
 #    org.springframework.context.support.DefaultListableBeanFactory: debug
 
 # zhiliao custom config

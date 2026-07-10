@@ -10,6 +10,6 @@ import java.util.List;
  * Future: SemanticDocumentSplitter (embedding similarity breakpoints)
  *         ParentChildDocumentSplitter (Parent 2048t + Child 512t)
  */
-public interface DocumentSplitter {
+public interface RecursiveDocumentSplitter {
     List<TextSegment> split(String text, String documentId);
 }

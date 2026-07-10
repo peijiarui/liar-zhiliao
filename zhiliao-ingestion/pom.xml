@@ -19,9 +19,14 @@
         </dependency>
 
         <!-- langchain4j Easy RAG：提供文档加载、分割、内存向量存储等 -->
+<!--        <dependency>-->
+<!--            <groupId>dev.langchain4j</groupId>-->
+<!--            <artifactId>langchain4j-easy-rag</artifactId>-->
+<!--        </dependency>-->
         <dependency>
             <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-easy-rag</artifactId>
+            <artifactId>langchain4j</artifactId>
+            <version>1.17.0</version>
         </dependency>
 
         <!-- milvus 向量数据库客户端 -->
@@ -76,12 +81,6 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
-        </dependency>
-
-        <!-- zhiliao-retrieval for EmbeddingService & VectorStore -->
-        <dependency>
-            <groupId>org.liar.ai</groupId>
-            <artifactId>zhiliao-retrieval</artifactId>
         </dependency>
 
         <!-- langchain4j-community-redis-spring-boot-starter弃用，采用milvus向量数据库 -->

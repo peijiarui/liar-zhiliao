@@ -4,7 +4,7 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ChatMessageDeserializer;
 import dev.langchain4j.data.message.ChatMessageSerializer;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
@@ -18,7 +18,7 @@ import java.util.List;
  */
 @Slf4j
 @Repository
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class CustomChatMemoryStore implements ChatMemoryStore {
 
     private final StringRedisTemplate redisTemplate;

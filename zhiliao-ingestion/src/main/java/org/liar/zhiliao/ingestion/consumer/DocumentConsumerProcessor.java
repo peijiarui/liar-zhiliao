@@ -6,7 +6,7 @@ import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.liar.zhiliao.ingestion.config.MinIOConfig;
 import org.liar.zhiliao.ingestion.entity.ZlChunk;
@@ -16,22 +16,20 @@ import org.liar.zhiliao.ingestion.mapper.ZlChunkMapper;
 import org.liar.zhiliao.ingestion.mapper.ZlDocumentMapper;
 import org.liar.zhiliao.ingestion.model.DocumentMessage;
 import org.liar.zhiliao.ingestion.service.DocumentParser;
-import org.liar.zhiliao.ingestion.service.DocumentSplitter;
-import org.springframework.context.ApplicationContext;
+import org.liar.zhiliao.ingestion.service.RecursiveDocumentSplitter;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Slf4j
 @Service
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class DocumentConsumerProcessor {
 
-    private ApplicationContext context;
     private final MinioClient minioClient;
     private final MinIOConfig minIOConfig;
     private final DocumentParser documentParser;
-    private final DocumentSplitter documentSplitter;
+    private final RecursiveDocumentSplitter recursiveDocumentSplitter;
     private final ZlDocumentMapper documentMapper;
     private final ZlChunkMapper chunkMapper;
     private final EmbeddingModel embeddingModel;
@@ -63,7 +61,7 @@ public class DocumentConsumerProcessor {
             String text = documentParser.parse(object, message.getFileName());
 
             // 4. Split into chunks
-            List<TextSegment> segments = documentSplitter.split(text, documentId.toString());
+            List<TextSegment> segments = recursiveDocumentSplitter.split(text, documentId.toString());
             log.info("Document {} split into {} chunks", documentId, segments.size());
 
             // 5. Embed all chunks via LangChain4j EmbeddingModel

@@ -1,6 +1,6 @@
 package org.liar.zhiliao.chat.controller;
 
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.liar.zhiliao.chat.service.ChatService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,7 +11,7 @@ import reactor.core.publisher.Flux;
  * @author Pei
  * @since 2026-06-30
  */
-@AllArgsConstructor
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/chat")
 public class ChatController {
