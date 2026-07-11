@@ -27,12 +27,12 @@ Phase 1 - 基础设施:
 Phase 2 - 文档摄入 + 向量化:
   zhiliao-ingestion 模块（MyBatis-Plus 实体 + Mapper + Service + Controller + Consumer）
   实体层:
-    zhiliao-ingestion/.../entity/Document.java                  (已存在)
-    zhiliao-ingestion/.../entity/Chunk.java                     (已存在)
+    zhiliao-ingestion/.../entity/ZlDocument.java                (已存在)
+    zhiliao-ingestion/.../entity/ZlChunk.java                   (已存在)
     zhiliao-ingestion/.../enums/DocumentStatusEnum.java         (已存在)
   持久层:
-    zhiliao-ingestion/.../mapper/DocumentMapper.java            (已存在)
-    zhiliao-ingestion/.../mapper/ChunkMapper.java               (已存在)
+    zhiliao-ingestion/.../mapper/ZlDocumentMapper.java          (已存在)
+    zhiliao-ingestion/.../mapper/ZlChunkMapper.java             (已存在)
     zhiliao-ingestion/.../config/MyBatisPlusConfig.java         (已存在)
     zhiliao-ingestion/.../config/JsonbTypeHandler.java          (已存在)
   服务层:
@@ -40,39 +40,40 @@ Phase 2 - 文档摄入 + 向量化:
     zhiliao-ingestion/.../service/impl/DocumentServiceImpl.java (已存在)
     zhiliao-ingestion/.../service/DocumentParser.java           (已存在)
     zhiliao-ingestion/.../service/impl/TikaDocumentParserImpl.java (已存在)
-    zhiliao-ingestion/.../service/DocumentSplitter.java         (已存在)
+    zhiliao-ingestion/.../service/RecursiveDocumentSplitter.java (已存在)
     zhiliao-ingestion/.../service/impl/RecursiveDocumentSplitterImpl.java (已存在)
   配置层:
     zhiliao-ingestion/.../config/MinIOConfig.java               (已存在)
     zhiliao-ingestion/.../config/RabbitMQConfig.java            (已存在)
-    zhiliao-ingestion/.../config/IngestionConfig.java           (已存在)
+    zhiliao-ingestion/.../config/SpringBeanConfig.java          (已存在)
   消息层:
     zhiliao-ingestion/.../model/DocumentMessage.java            (已存在)
   Controller + Consumer:
     zhiliao-ingestion/.../controller/DocumentController.java    (已存在)
     zhiliao-ingestion/.../consumer/DocumentConsumer.java         (已存在)
-    zhiliao-ingestion/.../consumer/DocumentConsumerProcessor.java (已存在，需补全处理逻辑)
+    zhiliao-ingestion/.../consumer/DocumentConsumerProcessor.java (已存在，处理逻辑已补全)
 
 Phase 3 - 检索查询:
-  zhiliao-retrieval/.../config/RetrievalConfig.java             (已存在)
-  (删除已注释的旧接口和实现: EmbeddingService, VectorStore, RetrieverService 等)
+  zhiliao-retrieval/.../tools/KnowledgeRetrievalTool.java       (新建，Tool-based 检索)
+  (替代旧方案：删除了 EmbeddingService, VectorStore, RetrieverService, MilvusConfig 等)
 
 Phase 4 - 对话增强 + JWT:
-  zhiliao-chat/src/main/resources/system-prompt.md              (修改)
+  zhiliao-chat/src/main/resources/system-prompt.md              (使用工具调用指令)
   zhiliao-chat/.../repository/CustomChatMemoryStore.java        (已存在，使用 Redis)
   zhiliao-chat/.../config/ChatMemoryConfig.java                 (已存在)
-  zhiliao-chat/.../service/ChatService.java                     (已存在)
+  zhiliao-chat/.../service/ChatService.java                     (已存在，注入 tools)
   zhiliao-chat/.../controller/ChatController.java               (已存在)
   zhiliao-common/.../model/CurrentUser.java                     (已存在)
   zhiliao-common/.../utils/UserContextHolder.java               (已存在)
   zhiliao-common/.../utils/JwtUtil.java                         (已存在)
+  zhiliao-app/.../config/CorsConfig.java                        (新建，跨域支持)
   zhiliao-auth/.../config/SecurityConfig.java                   (已存在)
   zhiliao-auth/.../filter/JwtFilter.java                        (已存在)
   zhiliao-auth/.../controller/AuthController.java               (已存在)
   zhiliao-auth/.../service/UserService.java                     (已存在)
   zhiliao-auth/.../service/impl/UserServiceImpl.java            (已存在)
-  zhiliao-auth/.../entity/User.java                             (已存在)
-  zhiliao-auth/.../mapper/UserMapper.java                       (已存在)
+  zhiliao-auth/.../entity/SysUser.java                          (已存在)
+  zhiliao-auth/.../mapper/SysUserMapper.java                    (已存在)
 ```
 
 ---
@@ -87,169 +88,44 @@ Phase 4 - 对话增强 + JWT:
 
 - [x] **Step 1: 创建 Docker Compose 配置文件**
 
-`docker/local-dev.yml`:
+`docker/local-dev.yml`（完整内容见实际文件，以下为结构概要）：
 
 ```yaml
-version: "3.8"
+# 网络：zhiliao-net（bridge）
+# Volumes：postgres-data, redis-data, minio-data, rabbitmq-data, etcd-data, milvus-data, milvus-minio-data
+
 services:
-  postgres:
-    image: postgres:16
-    environment:
-      POSTGRES_DB: zhiliao
-      POSTGRES_USER: zhiliao
-      POSTGRES_PASSWORD: zhiliao123
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U zhiliao"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+  postgres:      # postgres:16-alpine, 5432:5432
+  redis:         # redis/redis-stack:latest, 6379:6379, 8001:8001 (RedisInsight)
+  minio:         # minio/minio:latest, 9000:9000 (S3 API), 9001:9001 (Console)
+  minio-init:    # minio/mc:latest, 启动时自动创建 zhiliao-docs bucket
+  rabbitmq:      # rabbitmq:4-management-alpine, 5672:5672, 15672:15672
 
-  redis-stack:
-    image: redis/redis-stack-server:latest
-    ports:
-      - "6379:6379"
-      - "8001:8001"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+  # Milvus 独立模式（三容器协作，非嵌入式）：
+  etcd:          # quay.io/coreos/etcd:v3.5.18, 元数据存储
+  milvus-minio:  # minio/minio:latest, 向量数据存储
+  milvus:        # milvusdb/milvus:latest, 19530:19530, 使用外部 etcd + MinIO
 
-  minio:
-    image: minio/minio:latest
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: zhiliao
-      MINIO_ROOT_PASSWORD: zhiliao123
-    command: server /data --console-address ":9001"
-    volumes:
-      - miniodata:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  rabbitmq:
-    image: rabbitmq:3.13-management
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: zhiliao
-      RABBITMQ_DEFAULT_PASS: zhiliao123
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  milvus:
-    image: milvusdb/milvus:latest
-    ports:
-      - "19530:19530"
-      - "9091:9091"
-    environment:
-      ETCD_USE_EMBED: "true"
-      COMMON_STORAGE_TYPE: local
-    volumes:
-      - milvusdata:/var/lib/milvus
-
-volumes:
-  pgdata:
-  miniodata:
-  milvusdata:
+  # elasticsearch 注释掉，未来启用
 ```
 
 - [x] **Step 2: 创建数据库 DDL**
 
-`zhiliao-app/src/main/resources/sql/schema.sql`:
+`zhiliao-app/src/main/resources/sql/schema.sql`（完整内容见实际文件，以下为表结构概要）：
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- 核心表（全部使用 IF NOT EXISTS 支持幂等执行）：
+-- sys_department:    id, name, parent_id, tenant_id, created_at
+-- sys_user:          id, username, password_hash, dept_id, role(CHECK), tenant_id, created_at
+-- zl_knowledge_base: id, name, description, dept_id, tenant_id, created_at
+-- zl_document:       id, kb_id, file_name, file_type, status(CHECK), minio_key, file_size, md5, chunk_count, dept_id, tenant_id, created_at
+-- zl_chunk:          id, doc_id, content, embedding_id, metadata(JSONB), dept_id, tenant_id, created_at
+-- zl_conversation:   id, memory_id, user_id, title, message_count, dept_id, tenant_id, created_at
+-- zl_audit_log:      id, user_id, action, target_type, target_id, detail(JSONB), dept_id, tenant_id, created_at
 
-CREATE TABLE departments (
-    id          BIGSERIAL PRIMARY KEY,
-    name        VARCHAR(100) NOT NULL,
-    parent_id   BIGINT REFERENCES departments(id),
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE users (
-    id              BIGSERIAL PRIMARY KEY,
-    username        VARCHAR(50) NOT NULL UNIQUE,
-    password_hash   VARCHAR(255) NOT NULL,
-    dept_id         BIGINT NOT NULL DEFAULT 1 REFERENCES departments(id),
-    role            VARCHAR(20) NOT NULL DEFAULT 'USER',
-    tenant_id       VARCHAR(50) NOT NULL DEFAULT 'default',
-    created_at      TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE knowledge_bases (
-    id          BIGSERIAL PRIMARY KEY,
-    name        VARCHAR(200) NOT NULL,
-    description TEXT,
-    tenant_id   VARCHAR(50) NOT NULL DEFAULT 'default',
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE documents (
-    id          BIGSERIAL PRIMARY KEY,
-    kb_id       BIGINT NOT NULL REFERENCES knowledge_bases(id),
-    file_name   VARCHAR(500) NOT NULL,
-    file_type   VARCHAR(20) NOT NULL,
-    status      VARCHAR(20) NOT NULL DEFAULT 'UPLOADED',
-    minio_key   VARCHAR(500),
-    file_size   BIGINT DEFAULT 0,
-    md5         VARCHAR(32),
-    chunk_count INT DEFAULT 0,
-    error_msg   TEXT,
-    tenant_id   VARCHAR(50) NOT NULL DEFAULT 'default',
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE chunks (
-    id            BIGSERIAL PRIMARY KEY,
-    doc_id        BIGINT NOT NULL REFERENCES documents(id),
-    content       TEXT NOT NULL,
-    embedding_id  VARCHAR(100),
-    metadata      JSONB DEFAULT '{}',
-    tenant_id     VARCHAR(50) NOT NULL DEFAULT 'default',
-    created_at    TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE conversations (
-    id            BIGSERIAL PRIMARY KEY,
-    memory_id     VARCHAR(100) NOT NULL,
-    user_id       BIGINT REFERENCES users(id),
-    title         VARCHAR(500),
-    message_count INT DEFAULT 0,
-    tenant_id     VARCHAR(50) NOT NULL DEFAULT 'default',
-    created_at    TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE audit_logs (
-    id          BIGSERIAL PRIMARY KEY,
-    user_id     BIGINT REFERENCES users(id),
-    action      VARCHAR(100) NOT NULL,
-    target_type VARCHAR(50),
-    target_id   BIGINT,
-    detail      JSONB DEFAULT '{}',
-    tenant_id   VARCHAR(50) NOT NULL DEFAULT 'default',
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_documents_status ON documents(status);
-CREATE INDEX idx_documents_kb_id ON documents(kb_id);
-CREATE INDEX idx_chunks_doc_id ON chunks(doc_id);
-CREATE INDEX idx_conversations_memory_id ON conversations(memory_id);
+-- 索引：zl_document(kb_id, status, tenant+dept), zl_chunk(doc_id, tenant+dept),
+--       zl_conversation(memory_id, user_id, tenant+dept), sys_user(tenant+dept),
+--       sys_department(parent_id, tenant_id), kb(tenant+dept), audit_log(tenant+user)
 ```
 
 - [x] **Step 3: 创建种子数据**
@@ -257,16 +133,21 @@ CREATE INDEX idx_conversations_memory_id ON conversations(memory_id);
 `zhiliao-app/src/main/resources/sql/data.sql`:
 
 ```sql
-INSERT INTO departments (id, name) VALUES (1, '默认部门'), (2, '技术部'), (3, '产品部'), (4, '运营部');
+-- 部门（使用 ON CONFLICT DO NOTHING 幂等插入）
+INSERT INTO sys_department (name, parent_id, tenant_id)
+VALUES ('技术部', NULL, 'default'), ('产品部', NULL, 'default'), ('运营部', NULL, 'default')
+ON CONFLICT (tenant_id, name) DO NOTHING;
 
-INSERT INTO users (id, username, password_hash, dept_id, role) VALUES
-    (1, 'admin',    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 2, 'ADMIN'),
-    (2, 'zhangsan', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 3, 'USER'),
-    (3, 'lisi',     '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 4, 'USER');
--- 密码均为 123456'，需在启动后重新生成 BCrypt hash 并替换
-
-INSERT INTO knowledge_bases (id, name, description) VALUES
-    (1, '公司知识库', '默认知识库');
+-- 用户（dept_id 通过子查询解析）
+-- admin123 → BCrypt hash, 123456 → BCrypt hash
+INSERT INTO sys_user (username, password_hash, dept_id, role, tenant_id)
+VALUES ('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        (SELECT id FROM sys_department WHERE name = '技术部'), 'ADMIN', 'default'),
+       ('zhangsan', '$2a$10$.J9Dk5kBT0UQxYPfqYq3s.DGQPnwY3Y5GqYI71G2QrMnKN9JGKQTa',
+        (SELECT id FROM sys_department WHERE name = '产品部'), 'USER', 'default'),
+       ('lisi', '$2a$10$.J9Dk5kBT0UQxYPfqYq3s.DGQPnwY3Y5GqYI71G2QrMnKN9JGKQTa',
+        (SELECT id FROM sys_department WHERE name = '运营部'), 'USER', 'default')
+ON CONFLICT (username) DO NOTHING;
 ```
 
 - [x] **Step 4: 更新 application.yaml**
@@ -278,6 +159,8 @@ server:
   port: 8080
 
 spring:
+  autoconfigure:
+    exclude: dev.langchain4j.spring.LangChain4jAutoConfig
   application:
     name: liar-zhiliao
   data:
@@ -313,19 +196,17 @@ langchain4j:
       api-key: ${DEEPSEEK_API_KEY}
       model-name: deepseek-v4-flash
       log-requests: true
-      log-responses: true
     streaming-chat-model:
       base-url: https://api.deepseek.com
       api-key: ${DEEPSEEK_API_KEY}
       model-name: deepseek-v4-flash
       log-requests: true
-      log-responses: true
     embedding-model:
       base-url: https://llm-kyz5903txm3fyz8f.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
       api-key: ${QWEN_API_KEY}
       model-name: text-embedding-v4
+      max-segments-per-batch: 10
       log-requests: true
-      log-responses: true
   milvus:
     host: ${RESOURCE_SERVER_HOST}
     port: 19530
@@ -342,14 +223,10 @@ mybatis-plus:
 logging:
   level:
     dev.langchain4j: debug
+    org.liar.zhiliao.retrieval.service: debug
 
 # zhiliao custom config
 zhiliao:
-  jwt:
-    secret: zhiliao-jwt-secret-key-change-in-production-2026
-    expiration-ms: 86400000
-  retrieval:
-    store-type: milvus
   minio:
     endpoint: http://${RESOURCE_SERVER_HOST}:9000
     access-key: peijiarui
@@ -365,11 +242,11 @@ zhiliao:
 
 以下文件已存在，确认内容完整：
 
-- `zhiliao-ingestion/.../entity/Document.java` — `@TableName("documents")`, `@TableId(type = IdType.AUTO)`, 含 kbId/fileName/fileType/status/minioKey/fileSize/md5/chunkCount/tenantId/createdAt
-- `zhiliao-ingestion/.../entity/Chunk.java` — `@TableName("chunks")`, 含 docId/content/embeddingId/metadata(JSONB via JsonbTypeHandler)/tenantId/createdAt
+- `zhiliao-ingestion/.../entity/ZlDocument.java` — `@TableName("zl_document")`, `@TableId(type = IdType.AUTO)`, 含 kbId/fileName/fileType/status/minioKey/fileSize/md5/chunkCount/tenantId/createdAt
+- `zhiliao-ingestion/.../entity/ZlChunk.java` — `@TableName("zl_chunk")`, 含 docId/content/embeddingId/metadata(JSONB via JsonbTypeHandler)/tenantId/createdAt
 - `zhiliao-ingestion/.../enums/DocumentStatusEnum.java` — UPLOADED/PROCESSING/COMPLETED/FAILED
-- `zhiliao-ingestion/.../mapper/DocumentMapper.java` — `extends BaseMapper<Document>`
-- `zhiliao-ingestion/.../mapper/ChunkMapper.java` — `extends BaseMapper<Chunk>`
+- `zhiliao-ingestion/.../mapper/ZlDocumentMapper.java` — `extends BaseMapper<ZlDocument>`
+- `zhiliao-ingestion/.../mapper/ZlChunkMapper.java` — `extends BaseMapper<ZlChunk>`
 - `zhiliao-ingestion/.../config/MyBatisPlusConfig.java` — `MetaObjectHandler` 自动填充 `createdAt`
 - `zhiliao-ingestion/.../config/JsonbTypeHandler.java` — PostgreSQL JSONB TypeHandler
 
@@ -544,69 +421,57 @@ public class DocumentConsumerProcessor {
 
 ---
 
-### Task 7: zhiliao-retrieval 简化（删除已注释代码）
+### Task 7: zhiliao-retrieval 实现 KnowledgeRetrievalTool
 
 **Files:**
-- **Delete (注释块):** `zhiliao-retrieval/.../service/EmbeddingService.java`
-- **Delete (注释块):** `zhiliao-retrieval/.../service/VectorStore.java`
-- **Delete (注释块):** `zhiliao-retrieval/.../service/RetrieverService.java`
-- **Delete (注释块):** `zhiliao-retrieval/.../service/impl/DeepSeekEmbeddingService.java`
-- **Delete (注释块):** `zhiliao-retrieval/.../service/impl/MilvusVectorStore.java`
-- **Delete (注释块):** `zhiliao-retrieval/.../service/impl/MilvusRetriever.java`
-- **Delete (注释块):** `zhiliao-retrieval/.../config/MilvusConfig.java`
-- **Keep:** `zhiliao-retrieval/.../config/RetrievalConfig.java`
+- **Delete (旧接口，已不在代码库):** `zhiliao-retrieval/.../service/EmbeddingService.java`
+- **Delete (旧接口，已不在代码库):** `zhiliao-retrieval/.../service/VectorStore.java`
+- **Delete (旧接口，已不在代码库):** `zhiliao-retrieval/.../service/RetrieverService.java`
+- **Create:** `zhiliao-retrieval/.../tools/KnowledgeRetrievalTool.java`
 
-- [x] **Step 1: 删除已注释的旧接口和实现类**
+- [x] **Step 1: 确认唯一的活跃类是 KnowledgeRetrievalTool**
 
-```
-zhiliao-retrieval/src/main/java/.../service/
-  ├── EmbeddingService.java          ← 删除（全部注释掉）
-  ├── RetrieverService.java          ← 删除（全部注释掉）
-  ├── VectorStore.java               ← 删除（全部注释掉）
-  └── impl/
-      ├── DeepSeekEmbeddingService.java  ← 删除（全部注释掉）
-      ├── MilvusRetriever.java          ← 删除（全部注释掉）
-      └── MilvusVectorStore.java         ← 删除（全部注释掉）
-
-zhiliao-retrieval/src/main/java/.../config/
-  └── MilvusConfig.java              ← 删除（全部注释掉，LangChain4j 自动装配替代）
-```
-
-- [x] **Step 2: 确认唯一的活跃类—RetrievalConfig**
+MVP 采用 Tool-based 检索方案。`KnowledgeRetrievalTool` 是一个 `@Component`，通过 `@Tool` 注解暴露给 ChatService，由 LLM 自主决定是否调用。
 
 ```java
-package org.liar.zhiliao.retrieval.config;
-
-import dev.langchain4j.data.segment.TextSegment;
-import dev.langchain4j.model.embedding.EmbeddingModel;
-import dev.langchain4j.rag.content.retriever.ContentRetriever;
-import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
-import dev.langchain4j.store.embedding.EmbeddingStore;
-import lombok.AllArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
 @Slf4j
-@Configuration
-@AllArgsConstructor
-public class RetrievalConfig {
+@Component
+@RequiredArgsConstructor
+public class KnowledgeRetrievalTool {
 
     private final EmbeddingModel embeddingModel;
-    private final EmbeddingStore<TextSegment> embeddingStore;
+    private final EmbeddingStore<TextSegment> milvusEmbeddingStore;
 
-    @Bean("contentRetriever")
-    public ContentRetriever milvusContentRetriever() {
-        log.info("Initializing Milvus ContentRetriever (minScore=0.5, maxResults=5)");
-        return EmbeddingStoreContentRetriever.builder()
-                .embeddingStore(embeddingStore)
-                .embeddingModel(embeddingModel)
-                .minScore(0.5)
+    @Tool("检索企业知识库：查找公司制度、政策、流程、产品信息等企业内部知识。仅当用户明确询问企业内部知识时调用，日常闲聊无需调用")
+    public String retrieveKnowledge(@P("查询内容") String query) {
+        Embedding queryEmbedding = embeddingModel.embed(query).content();
+        EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
+                .queryEmbedding(queryEmbedding)
                 .maxResults(5)
+                .minScore(0.5)
                 .build();
+        EmbeddingSearchResult<TextSegment> result = milvusEmbeddingStore.search(request);
+        // 无匹配返回空字符串，LLM 据此告知用户
+        List<EmbeddingMatch<TextSegment>> matches = result.matches();
+        if (matches.isEmpty()) return "";
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < matches.size(); i++) {
+            if (i > 0) sb.append("\n---\n");
+            sb.append(matches.get(i).embedded().text());
+        }
+        return sb.toString();
     }
 }
 ```
+
+- [x] **Step 2: ChatService 注入 KnowledgeRetrievalTool**
+
+`ChatService.java` 通过 `tools = {"knowledgeRetrievalTool"}` 注册工具，LangChain4j 自动发现并注入。
+
+- [x] **Step 3: System Prompt 增加工具调用指令**
+
+`system-prompt.md` 指导 LLM 何时调用检索工具，替代传统的 EmbeddingQueryRouter 意图路由。
 
 ---
 
@@ -625,28 +490,36 @@ public class RetrievalConfig {
 
 **CustomChatMemoryStore** — 通过 `StringRedisTemplate` 读写，`ChatMessageSerializer` 序列化/反序列化
 
-**ChatService** — `@AiService` 接口，显式装配模式：
+**ChatService** — `@AiService` 接口，显式装配模式，注入 `knowledgeRetrievalTool`：
 ```java
 @AiService(wiringMode = AiServiceWiringMode.EXPLICIT,
         chatModel = "openAiChatModel",
         streamingChatModel = "openAiStreamingChatModel",
         chatMemory = "chatMemory",
         chatMemoryProvider = "chatMemoryProvider",
-        contentRetriever = "contentRetriever")
+        tools = {"knowledgeRetrievalTool"})
+public interface ChatService {
+    @SystemMessage(fromResource = "system-prompt.md")
+    Flux<String> chat(@MemoryId String memoryId, @UserMessage String userMessage);
+}
 ```
 
-- [x] **Step 1: 确认 System Prompt 包含引用溯源指令**
+- [x] **Step 1: 确认 System Prompt 包含工具调用指令**
 
 `system-prompt.md`：
 ```markdown
 你是一个企业知识库助手，名叫知了知了，负责答疑。
 
-## 回答要求
-1. 仅根据提供的文档内容回答，不要编造信息
-2. 每段回答末尾标注来源文档标题，格式：[来源：xxx.pdf]
-3. 如果没有检索到相关文档内容，明确说明"文档库中未找到相关信息"
-4. 禁止编造文档中不存在的内容
-5. 回答简洁准确，使用中文
+你拥有一个知识检索工具 `retrieveKnowledge`，当用户询问公司内部知识时调用它来获取相关信息。
+同时你也可以进行日常闲聊。
+
+### 规则
+
+1. **知识问答**：当用户询问公司制度、政策、流程、产品信息等企业内部知识时，
+   调用 `retrieveKnowledge` 工具进行检索，仅根据检索返回的内容回答。
+   如果返回内容为空，明确说明"知识库中未找到相关信息"。禁止编造不存在的内容。
+2. **自由对话**：日常闲聊、问候、感谢、自我介绍等不需要检索的内容，直接回答，
+   **不要调用** `retrieveKnowledge` 工具。
 ```
 
 ---
@@ -655,8 +528,8 @@ public class RetrievalConfig {
 
 **Files:**
 - Verify: `zhiliao-auth/.../config/SecurityConfig.java`
-- Verify: `zhiliao-auth/.../entity/User.java`
-- Verify: `zhiliao-auth/.../mapper/UserMapper.java`
+- Verify: `zhiliao-auth/.../entity/SysUser.java`
+- Verify: `zhiliao-auth/.../mapper/SysUserMapper.java`
 - Verify: `zhiliao-auth/.../service/UserService.java`
 - Verify: `zhiliao-auth/.../service/impl/UserServiceImpl.java`
 - Verify: `zhiliao-auth/.../filter/JwtFilter.java`
@@ -667,9 +540,9 @@ public class RetrievalConfig {
 
 **SecurityConfig** — `@Bean PasswordEncoder` (BCryptPasswordEncoder)
 
-**User 实体** — MyBatis-Plus 注解（`@TableId`, `@TableField`, `@Builder`），含 id/username/passwordHash/deptId/role/tenantId/createdAt
+**SysUser 实体** — MyBatis-Plus 注解（`@TableName("sys_user")`, `@TableId`, `@TableField`, `@Builder`），含 id/username/passwordHash/deptId/role/tenantId/createdAt
 
-**UserMapper** — `extends BaseMapper<User>`
+**SysUserMapper** — `extends BaseMapper<SysUser>`
 
 **UserService 接口 + UserServiceImpl**：
 ```java
@@ -687,7 +560,7 @@ public interface UserService {
 
 **AuthController** — `POST /api/auth/login` 返回 `{ token: "..." }`
 
-**JwtUtil** — JJWT 签发/解析/验证，HMAC-SHA256，属性 `zhiliao.jwt.secret` + `zhiliao.jwt.expiration-ms`
+**JwtUtil** — JJWT 签发/解析/验证，HMAC-SHA256，secret/expiration 通过 `@Value` 注入（`${zhiliao.jwt.secret}` / `${zhiliao.jwt.expiration-ms}`），均有 fallback 默认值，非必需在 application.yaml 中配置
 
 **UserContextHolder** — ThreadLocal，set/get/clear 当前用户
 
