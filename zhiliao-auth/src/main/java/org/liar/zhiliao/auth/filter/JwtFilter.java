@@ -1,6 +1,7 @@
 package org.liar.zhiliao.auth.filter;
 
 import jakarta.servlet.*;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class JwtFilter implements Filter {
             throws IOException, ServletException {
 
         HttpServletRequest request = (HttpServletRequest) servletRequest;
+        HttpServletResponse response = (HttpServletResponse) servletResponse;
         String path = request.getRequestURI();
 
         // Skip auth for login and OAuth2 endpoints
@@ -34,21 +36,35 @@ public class JwtFilter implements Filter {
             return;
         }
 
-        String authHeader = request.getHeader("Authorization");
+        String token = extractToken(request);
 
         try {
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                String token = authHeader.substring(7);
-                if (jwtUtil.validateToken(token)) {
-                    CurrentUser user = jwtUtil.parseToken(token);
-                    UserContextHolder.set(user);
-                    chain.doFilter(servletRequest, servletResponse);
-                    return;
-                }
+            if (token != null && jwtUtil.validateToken(token)) {
+                CurrentUser user = jwtUtil.parseToken(token);
+                UserContextHolder.set(user);
+                chain.doFilter(servletRequest, servletResponse);
+                return;
             }
-            ((HttpServletResponse) servletResponse).sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
         } finally {
             UserContextHolder.clear();
         }
+    }
+
+    /** 优先从 Authorization header 提取 token，回退到 zhiliao_token cookie */
+    private String extractToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if ("zhiliao_token".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
     }
 }

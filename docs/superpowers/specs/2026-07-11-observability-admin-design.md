@@ -1,11 +1,11 @@
 # 可观测性与运维设计文档
 
-> 版本：v1.0 | 日期：2026-07-11 | 作者：Pei
+> 版本：v1.1 | 日期：2026-07-13 | 作者：Pei
 > 基于：企业级 RAG 知识库架构设计文档 (v1.0)
 
 ## 1. 概述
 
-本文档覆盖"企业级 RAG 知识库"第三阶段**可观测性与运维**的设计方案。当前 MVP 无缓存、无限流、无监控、无管理后台。阶段三新增两级缓存、限流熔断、Prometheus/Grafana 监控、管理后台 REST API 四项能力。
+本文档覆盖"企业级 RAG 知识库"第三阶段**可观测性与运维**的设计方案。当前 MVP 无缓存、无限流、无监控、无管理后台。阶段三新增两级缓存、限流熔断、Prometheus/Grafana 监控、管理后台 REST API、Spring Security OAuth2 Client 迁移五项能力。
 
 ## 2. 两级缓存
 
@@ -338,7 +338,147 @@ public record DashboardVO(
 | `SchemaVO.java` 等 VO 类 | zhiliao-admin | 若干新建 |
 | `audit_log` 使用已有 mapper | zhiliao-auth | 复用 SysUserMapper、ZlDocumentMapper 等 |
 
-## 6. 数据流转示意
+## 6. Spring Security OAuth2 Client 迁移
+
+### 6.1 背景
+
+Phase 2 采用手写 OAuth2 认证（`OAuth2Authenticator` 接口 + `OAuth2Controller` + RestTemplate），仅依赖 `spring-security-crypto`。手写方案授权码流程、CSRF state 校验、token 换取均需自行维护。
+
+Phase 3 迁移到 Spring Security OAuth2 Client，由框架接管认证流程，减少自维护代码，获得内置安全特性（CSRF 保护、session 管理、`SecurityContextHolder`）。
+
+### 6.2 迁移策略
+
+**保留不动：**
+- `JwtUtil`（JWT 签发/校验逻辑，Spring Security 不接管）
+- `UserLinkService`（邮箱合并逻辑，作为 `OAuth2UserService` 的一部分）
+- `JwtFilter`（继续拦截非 OAuth2 路径）
+
+**替换：**
+- `OAuth2Authenticator` / `GitHubAuthenticator` / `DingTalkAuthenticator` → 由 `application.yaml` 配置替代
+- `OAuth2Controller` → 由 Spring Security 自动生成的 `/oauth2/authorization/*` 端点替代
+- 手写 state 校验 → Spring Security 内置
+
+**新增：**
+- `SecurityConfig` 中的 `SecurityFilterChain` Bean
+- 自定义 `OAuth2UserService`（对接 `UserLinkService`）
+- `OAuth2LoginSuccessHandler`（签发 JWT + Cookie）
+
+### 6.3 依赖变更
+
+```xml
+<!-- 移除：spring-security-crypto（独立引用） -->
+<!-- 新增：spring-boot-starter-oauth2-client（包含 crypto + oauth2） -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-oauth2-client</artifactId>
+</dependency>
+```
+
+### 6.4 配置
+
+```yaml
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: ${GITHUB_CLIENT_ID}
+            client-secret: ${GITHUB_CLIENT_SECRET}
+            scope: user:email
+          dingtalk:
+            client-id: ${DINGTALK_APP_ID}
+            client-secret: ${DINGTALK_APP_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            provider: dingtalk
+        provider:
+          dingtalk:
+            authorization-uri: https://login.dingtalk.com/oauth2/auth
+            token-uri: https://api.dingtalk.com/v1.0/oauth2/userAccessToken
+            user-info-uri: https://api.dingtalk.com/v1.0/contact/users/me
+            user-name-attribute: unionId
+```
+
+### 6.5 SecurityFilterChain 整合
+
+```java
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http,
+            OAuth2LoginSuccessHandler successHandler) throws Exception {
+        http
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/oauth2/**", "/login/**", "/api/auth/login").permitAll()
+                .anyRequest().authenticated()
+            )
+            .oauth2Login(oauth2 -> oauth2
+                .successHandler(successHandler)
+                .userInfoEndpoint(userInfo -> userInfo
+                    .userService(customOAuth2UserService))
+            );
+        return http.build();
+    }
+}
+```
+
+### 6.6 自定义 OAuth2UserService + SuccessHandler
+
+```java
+/**
+ * 自定义 OAuth2UserService，对接 Phase 2 的邮箱合并逻辑。
+ * 在 Spring Security 获取到 OAuth2UserInfo 后调用 UserLinkService。
+ */
+@Component
+@RequiredArgsConstructor
+public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
+
+    private final UserLinkService userLinkService;
+
+    @Override
+    public OAuth2User loadUser(OAuth2UserRequest userRequest) {
+        // 获取 provider 名称 + 用户信息 → 调用 UserLinkService.linkOrCreate()
+        // 返回包含 SysUser 的 OAuth2User 实现
+    }
+}
+
+/**
+ * 登录成功后签发 JWT + 设置 Cookie，302 重定向到首页。
+ */
+@Component
+@RequiredArgsConstructor
+public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
+
+    private final JwtUtil jwtUtil;
+
+    @Override
+    public void onAuthenticationSuccess(HttpServletRequest request,
+            HttpServletResponse response, Authentication authentication) throws IOException {
+        // 从 authentication 中获取 CurrentUser → 签发 JWT → Cookie → 302
+    }
+}
+```
+
+### 6.7 涉及文件
+
+| 文件 | 模块 | 操作 |
+|------|------|------|
+| `pom.xml` | zhiliao-auth | 替换 spring-security-crypto → spring-boot-starter-oauth2-client |
+| `SecurityConfig.java` | zhiliao-auth | 重写，添加 SecurityFilterChain |
+| `CustomOAuth2UserService.java` | zhiliao-auth | 新建，对接 UserLinkService |
+| `OAuth2LoginSuccessHandler.java` | zhiliao-auth | 新建，签发 JWT |
+| `OAuth2Authenticator.java` | zhiliao-auth | **删除**（替换为配置） |
+| `GitHubAuthenticator.java` | zhiliao-auth | **删除** |
+| `DingTalkAuthenticator.java` | zhiliao-auth | **删除** |
+| `WeChatAuthenticator.java` | zhiliao-auth | **删除** |
+| `OAuth2Controller.java` | zhiliao-auth | **删除**（替换为框架端点） |
+| `RestTemplateConfig.java` | zhiliao-auth | **删除**（不再需要） |
+| `application.yaml` | zhiliao-app | 迁移 oauth2 → spring.security.oauth2.client |
+
+## 7. 数据流转示意
 
 ```
 用户请求 → @RateLimiter(限流) → ChatController → InputFilter
@@ -355,9 +495,9 @@ public record DashboardVO(
   → zhiliao-admin Controller → MyBatis-Plus CRUD
 ```
 
-## 7. 不影响已有功能
+## 8. 不影响已有功能
 
 - 文档摄入管线（ingestion）不修改
 - 检索管线（retrieval）仅追加缓存和指标，不改动现有逻辑
-- 用户认证（auth）仅追加 AdminFilter，不改动现有 JwtFilter 和 AuthController
+- 用户认证（auth）Phase 3 Spring Security 迁移替换 OAuth2 手写实现，`JwtUtil`、`JwtFilter`、`UserLinkService` 保留不动
 - 前端测试客户端不修改
