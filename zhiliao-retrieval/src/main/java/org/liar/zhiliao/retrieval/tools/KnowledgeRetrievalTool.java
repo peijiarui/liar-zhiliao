@@ -12,6 +12,8 @@ import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.liar.zhiliao.common.model.CurrentUser;
+import org.liar.zhiliao.common.utils.UserContextHolder;
 import org.liar.zhiliao.retrieval.repository.ChunkRepository;
 import org.liar.zhiliao.retrieval.records.RankedChunk;
 import org.liar.zhiliao.retrieval.service.Reranker;
@@ -64,7 +66,11 @@ public class KnowledgeRetrievalTool {
             allDenseResults.addAll(result.matches());
 
             // 2b: PG BM25 稀疏检索
-            allSparseResults.addAll(sparseSearcher.search(subQuery, 10));
+            CurrentUser currentUser = UserContextHolder.get();
+            List<Long> visibleDeptIds = currentUser != null
+                    ? currentUser.visibleDeptIds()
+                    : List.of(1L); // fallback: dept 1
+            allSparseResults.addAll(sparseSearcher.search(subQuery, 10, visibleDeptIds));
         }
 
         // Step 3: RRF 融合排序

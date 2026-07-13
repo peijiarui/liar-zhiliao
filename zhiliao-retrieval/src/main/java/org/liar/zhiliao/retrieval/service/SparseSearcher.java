@@ -10,5 +10,5 @@ import java.util.List;
  * 未来：EsBm25Searcher — Elasticsearch BM25，部署 ES 后切换
  */
 public interface SparseSearcher {
-    List<SparseSearchResult> search(String query, int topK);
+    List<SparseSearchResult> search(String query, int topK, List<Long> visibleDeptIds);
 }
