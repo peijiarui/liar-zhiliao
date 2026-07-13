@@ -77,4 +77,10 @@ public class ConversationService extends ServiceImpl<ConversationMapper, Convers
             updateById(conversation);
         }
     }
+
+    public Conversation getByMemoryId(String memoryId) {
+        LambdaQueryWrapper<Conversation> wrapper = new LambdaQueryWrapper<Conversation>()
+                .eq(Conversation::getMemoryId, memoryId);
+        return getOne(wrapper);
+    }
 }
