@@ -1,6 +1,7 @@
 package org.liar.zhiliao.chat.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.liar.zhiliao.chat.security.InputFilter;
 import org.liar.zhiliao.chat.service.ChatService;
 import org.liar.zhiliao.chat.service.TitleGenerationService;
 import org.liar.zhiliao.chat.service.ConversationService;
@@ -21,20 +22,30 @@ public class ChatController {
     private final ChatService assistant;
     private final ConversationService conversationService;
     private final TitleGenerationService titleGenerationService;
+    private final InputFilter inputFilter;
 
     @GetMapping(produces = "text/html;charset=utf-8")
     public Flux<String> chat(String memoryId, String message) {
-        // 更新会话最后活动时间
+        // 输入长度限制
+        if (message != null && message.length() > 2000) {
+            message = message.substring(0, 2000);
+        }
+
+        // Prompt 注入检测
+        String rejection = inputFilter.check(message);
+        if (rejection != null) {
+            return Flux.just("输入被拒绝：" + rejection);
+        }
+
+        final String finalMessage = message;
         conversationService.touchConversation(memoryId);
 
-        return assistant.chat(memoryId, message)
+        return assistant.chat(memoryId, finalMessage)
                 .doOnComplete(() -> {
-                    // 原子性检查并更新标题，防止并发竞态
                     if (conversationService.tryUpdateTitleIfDefault(memoryId, "生成中...")) {
-                        titleGenerationService.generateTitleAsync(memoryId, message);
+                        titleGenerationService.generateTitleAsync(memoryId, finalMessage);
                     }
                 });
     }
-
 
 }
