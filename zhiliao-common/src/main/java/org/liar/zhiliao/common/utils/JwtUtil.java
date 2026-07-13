@@ -14,11 +14,13 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.List;
 
 @Component
 public class JwtUtil {
     private static final String USERNAME_CLAIM = "username";
     private static final String DEPT_ID_CLAIM = "deptId";
+    private static final String VISIBLE_DEPT_IDS_CLAIM = "visibleDeptIds";
 
     private final SecretKey key;
     private final long expirationMs;
@@ -35,6 +37,7 @@ public class JwtUtil {
                 .subject(user.id().toString())
                 .claim(USERNAME_CLAIM, user.username())
                 .claim(DEPT_ID_CLAIM, user.deptId())
+                .claim(VISIBLE_DEPT_IDS_CLAIM, user.visibleDeptIds())
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + expirationMs))
                 .signWith(key)
@@ -47,11 +50,18 @@ public class JwtUtil {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        return new CurrentUser(
-                safeParseLong(claims.getSubject()),
-                claims.get(USERNAME_CLAIM, String.class),
-                claims.get(DEPT_ID_CLAIM, Long.class)
-        );
+
+        Long id = safeParseLong(claims.getSubject());
+        String username = claims.get(USERNAME_CLAIM, String.class);
+        Long deptId = claims.get(DEPT_ID_CLAIM, Long.class);
+
+        @SuppressWarnings("unchecked")
+        List<Integer> rawDeptIds = claims.get(VISIBLE_DEPT_IDS_CLAIM, List.class);
+        List<Long> visibleDeptIds = (rawDeptIds != null)
+                ? rawDeptIds.stream().map(Integer::longValue).toList()
+                : List.of(deptId != null ? deptId : 1L);
+
+        return new CurrentUser(id, username, deptId, visibleDeptIds);
     }
 
     private static Long safeParseLong(String value) {
