@@ -1,14 +1,17 @@
 package org.liar.zhiliao.auth.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.liar.zhiliao.auth.entity.SysUser;
 import org.liar.zhiliao.auth.oauth2.OAuth2Authenticator;
 import org.liar.zhiliao.auth.oauth2.OAuth2Config;
 import org.liar.zhiliao.auth.oauth2.OAuth2UserInfo;
+import org.liar.zhiliao.auth.service.DeptPermissionService;
 import org.liar.zhiliao.auth.service.UserLinkService;
+import org.liar.zhiliao.auth.entity.SysUser;
 import org.liar.zhiliao.common.model.CurrentUser;
 import org.liar.zhiliao.common.utils.JwtUtil;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * OAuth2 登录控制器。
@@ -29,23 +33,39 @@ public class OAuth2Controller {
 
     private final List<OAuth2Authenticator> authenticators;
     private final UserLinkService userLinkService;
+    private final DeptPermissionService deptPermissionService;
     private final JwtUtil jwtUtil;
     private final OAuth2Config config;
 
-    /** GET /oauth2/github — 302 跳转 GitHub 授权页 */
+    /** GET /oauth2/github — 302 跳转 GitHub 授权页（含 state CSRF 保护） */
     @GetMapping("/oauth2/github")
-    public void githubAuthorize(HttpServletResponse response) throws IOException {
+    public void githubAuthorize(HttpServletRequest request, HttpServletResponse response) throws IOException {
         OAuth2Config.ProviderConfig github = config.getGithub();
+        String state = UUID.randomUUID().toString();
+        request.getSession(true).setAttribute("oauth_state", state);
         String url = String.format(
-                "https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=user:email",
-                github.getClientId(), github.getRedirectUri());
+                "https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=user:email&state=%s",
+                github.getClientId(), github.getRedirectUri(), state);
         response.sendRedirect(url);
     }
 
     /** GET /oauth2/{provider}/callback — OAuth2 统一回调入口 */
     @GetMapping("/oauth2/{provider}/callback")
     public void callback(@PathVariable String provider, @RequestParam("code") String code,
-                         HttpServletResponse response) throws IOException {
+                         @RequestParam(value = "state", required = false) String state,
+                         HttpServletRequest request, HttpServletResponse response) throws IOException {
+        // 仅对 GitHub OAuth 验证 state 参数（CSRF 保护）
+        if ("github".equals(provider)) {
+            HttpSession session = request.getSession(false);
+            String savedState = (session != null) ? (String) session.getAttribute("oauth_state") : null;
+            if (savedState == null || !savedState.equals(state)) {
+                log.warn("OAuth state mismatch: provider={}, expected={}, actual={}", provider, savedState, state);
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid OAuth state parameter");
+                return;
+            }
+            session.removeAttribute("oauth_state");
+        }
+
         OAuth2Authenticator authenticator = authenticators.stream()
                 .filter(a -> a.provider().equals(provider))
                 .findFirst()
@@ -53,7 +73,9 @@ public class OAuth2Controller {
 
         OAuth2UserInfo userInfo = authenticator.authenticate(code);
         SysUser user = userLinkService.linkOrCreate(userInfo, provider);
-        CurrentUser currentUser = new CurrentUser(user.getId(), user.getUsername(), user.getDeptId());
+
+        List<Long> visibleDeptIds = deptPermissionService.getVisibleDeptIds(user.getDeptId());
+        CurrentUser currentUser = CurrentUser.of(user.getId(), user.getUsername(), user.getDeptId(), visibleDeptIds);
         String token = jwtUtil.generateToken(currentUser);
 
         log.info("OAuth login success: provider={}, userId={}, username={}", provider, user.getId(), user.getUsername());

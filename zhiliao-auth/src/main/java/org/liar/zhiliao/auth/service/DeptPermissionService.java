@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 部门权限查询服务。
@@ -35,5 +36,18 @@ public class DeptPermissionService {
         return visibilities.stream()
                 .map(ZlKbDeptVisibility::getKbId)
                 .toList();
+    }
+
+    /**
+     * 查询指定部门可见的部门 ID 列表（含自身）。
+     * MVP 实现：返回仅包含自身 deptId 的列表，未来可扩展为包含父级部门。
+     *
+     * @param deptId 部门 ID
+     * @return 可见部门 ID 列表，至少包含自身
+     */
+    public List<Long> getVisibleDeptIds(Long deptId) {
+        return Optional.ofNullable(deptId)
+                .map(List::of)
+                .orElseGet(Collections::emptyList);
     }
 }
