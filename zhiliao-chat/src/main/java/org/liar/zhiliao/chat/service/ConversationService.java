@@ -62,6 +62,7 @@ public class ConversationService extends ServiceImpl<ConversationMapper, Convers
         Conversation conversation = getOne(wrapper);
         if (conversation != null) {
             conversation.setTitle(title);
+            conversation.setUpdatedAt(OffsetDateTime.now());
             updateById(conversation);
         }
     }
