@@ -3,6 +3,7 @@ package org.liar.zhiliao.chat.repository;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ChatMessageDeserializer;
 import dev.langchain4j.data.message.ChatMessageSerializer;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,8 +33,28 @@ public class CustomChatMemoryStore implements ChatMemoryStore {
         return ChatMessageDeserializer.messagesFromJson(jsonData);
     }
 
+    private static final int MAX_TOOL_RESULT_LENGTH = 300;
+
     @Override
     public void updateMessages(Object memoryId, List<ChatMessage> messages) {
+
+//        //1.截断工具执行结果，避免存储冗余的大文本，仅保留一部分
+//        List<ChatMessage> processedMessages = messages.stream()
+//                .map(m -> {
+//                    if (m instanceof ToolExecutionResultMessage toolMsg && toolMsg.hasSingleText()) {
+//                        String text = toolMsg.text();
+//                        if (text != null && text.length() > MAX_TOOL_RESULT_LENGTH) {
+//                            text = text.substring(0, MAX_TOOL_RESULT_LENGTH);
+////                          return toolMsg.toBuilder().text(text).build();
+//                            return new ToolExecutionResultMessage(toolMsg.id(), toolMsg.toolName(), text);
+//                        }
+//                    }
+//                    return m;
+//                })
+//                .toList();
+//        //2.借助 ChatMessageSerializer（由langchain4j提供） 将 消息列表序列化为 JSON
+//        String jsonData = ChatMessageSerializer.messagesToJson(processedMessages);
+
         //更新会话消息
         //1.借助 ChatMessageSerializer（由langchain4j提供） 将 消息列表序列化为 JSON
         String jsonData = ChatMessageSerializer.messagesToJson(messages);

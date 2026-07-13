@@ -50,15 +50,15 @@ public class ConversationController {
     public ResponseEntity<List<MessageResponse>> getMessages(@PathVariable String memoryId) {
         List<ChatMessage> messages = chatMemoryStore.getMessages(memoryId);
         List<MessageResponse> result = messages.stream()
+                .filter(m -> m.type() == ChatMessageType.USER
+                        || (m instanceof AiMessage ai && ai.text() != null && !ai.text().isBlank()))
                 .map(m -> {
                     String role = m.type() == ChatMessageType.USER ? "user" : "assistant";
                     String content;
                     if (m instanceof UserMessage userMessage) {
                         content = userMessage.singleText();
-                    } else if (m instanceof AiMessage aiMessage) {
-                        content = aiMessage.text();
                     } else {
-                        content = "";
+                        content = ((AiMessage) m).text();
                     }
                     return new MessageResponse(role, content);
                 })

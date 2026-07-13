@@ -9,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/documents")
@@ -16,6 +18,26 @@ import org.springframework.web.multipart.MultipartFile;
 public class DocumentController {
 
     private final DocumentService documentService;
+
+    @GetMapping
+    public ResponseEntity<List<DocumentRespVO>> list(
+            @RequestParam(value = "kbId", required = false) Long kbId,
+            @RequestParam(value = "page", required = false) Integer page,
+            @RequestParam(value = "pageSize", defaultValue = "20") Integer pageSize) {
+        List<ZlDocument> docs = documentService.listDocuments(kbId, page, pageSize);
+        List<DocumentRespVO> result = docs.stream()
+                .map(doc -> DocumentRespVO.builder()
+                        .id(doc.getId())
+                        .fileName(doc.getFileName())
+                        .fileType(doc.getFileType())
+                        .status(doc.getStatus())
+                        .fileSize(doc.getFileSize())
+                        .chunkCount(doc.getChunkCount())
+                        .createdAt(doc.getCreatedAt())
+                        .build())
+                .toList();
+        return ResponseEntity.ok(result);
+    }
 
     @PostMapping("/upload")
     public ResponseEntity<?> upload(

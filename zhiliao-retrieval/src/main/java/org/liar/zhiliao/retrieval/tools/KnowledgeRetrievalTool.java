@@ -4,6 +4,7 @@ import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
@@ -11,8 +12,15 @@ import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.liar.zhiliao.retrieval.repository.ChunkRepository;
+import org.liar.zhiliao.retrieval.records.RankedChunk;
+import org.liar.zhiliao.retrieval.service.Reranker;
+import org.liar.zhiliao.retrieval.records.SparseSearchResult;
+import org.liar.zhiliao.retrieval.service.SparseSearcher;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -26,37 +34,89 @@ public class KnowledgeRetrievalTool {
 
     private final EmbeddingModel embeddingModel;
     private final EmbeddingStore<TextSegment> milvusEmbeddingStore;
+    private final SparseSearcher sparseSearcher;
+    private final Reranker reranker;
+    private final ChunkRepository chunkRepository;
+    private final ChatModel chatModel;
 
     @Tool("检索企业知识库：查找公司制度、政策、流程、产品信息等企业内部知识。仅当用户明确询问企业内部知识时调用，日常闲聊无需调用")
     public String retrieveKnowledge(@P("查询内容") String query) {
-        log.debug("KnowledgeRetrievalService 检索: {}", query);
+        // Step 1: 查询改写
+        List<String> subQueries = rewriteQuery(query);
+        if (subQueries.isEmpty()) {
+            subQueries = List.of(query);
+        }
+        log.debug("Rewritten queries: {}", subQueries);
 
-        // 1. 将用户问题向量化（仅此一次调用）
-        Embedding queryEmbedding = embeddingModel.embed(query).content();
+        // Step 2: 对每个子查询执行双路检索
+        List<EmbeddingMatch<TextSegment>> allDenseResults = new ArrayList<>();
+        List<SparseSearchResult> allSparseResults = new ArrayList<>();
 
-        // 2. 在 Milvus 中执行相似度检索
-        EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
-                .queryEmbedding(queryEmbedding)
-                .maxResults(5)
-                .minScore(0.5)
-                .build();
-        EmbeddingSearchResult<TextSegment> result = milvusEmbeddingStore.search(request);
+        for (String subQuery : subQueries) {
+            // 2a: Milvus 稠密检索
+            Embedding queryEmbedding = embeddingModel.embed(subQuery).content();
+            EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
+                    .queryEmbedding(queryEmbedding)
+                    .maxResults(10)
+                    .minScore(0.5)
+                    .build();
+            EmbeddingSearchResult<TextSegment> result = milvusEmbeddingStore.search(request);
+            allDenseResults.addAll(result.matches());
 
-        // 3. 无匹配结果时返回空字符串，LLM 据此告知用户未找到相关信息
-        List<EmbeddingMatch<TextSegment>> matches = result.matches();
-        if (matches.isEmpty()) {
+            // 2b: PG BM25 稀疏检索
+            allSparseResults.addAll(sparseSearcher.search(subQuery, 10));
+        }
+
+        // Step 3: RRF 融合排序
+        List<RankedChunk> ranked = reranker.rerank(query, allDenseResults, allSparseResults, 10);
+
+        if (ranked.isEmpty()) {
             return "";
         }
 
-        // 4. 拼接检索结果，多个文档间用分隔线隔开，LLM 会自动格式化回答
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < matches.size(); i++) {
-            if (i > 0) {
-                sb.append("\n---\n");
+        // Step 4: 父子文档替换（child → parent content）
+        StringBuilder context = new StringBuilder();
+        for (RankedChunk chunk : ranked) {
+            String content;
+            if (chunk.parentId() != null) {
+                try {
+                    content = chunkRepository.findContentById(chunk.parentId());
+                } catch (Exception e) {
+                    log.warn("Parent content not found for parentId={}, using child content", chunk.parentId());
+                    content = chunk.content();
+                }
+            } else {
+                content = chunk.content();
             }
-            sb.append(matches.get(i).embedded().text());
+            if (!context.isEmpty()) {
+                context.append("\n---\n");
+            }
+            context.append(content);
         }
-        return sb.toString();
+
+        return context.toString();
     }
 
+    /** 调用 LLM 改写查询，支持多维度子查询 */
+    private List<String> rewriteQuery(String query) {
+        String prompt = """
+                你是一个查询优化助手。将用户的问题改写成更适合检索的关键词形式。
+                如果问题包含多个方面，用换行分隔多个查询。
+                不要添加与问题无关的关键词。不要回答用户的问题，只输出改写后的关键词。
+
+                用户问题：%s
+                改写后：
+                """.formatted(query);
+
+        try {
+            String result = chatModel.chat(prompt);
+            return Arrays.stream(result.split("\\n"))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+        } catch (Exception e) {
+            log.warn("Query rewriting failed, using original query: {}", e.getMessage());
+            return List.of();
+        }
+    }
 }

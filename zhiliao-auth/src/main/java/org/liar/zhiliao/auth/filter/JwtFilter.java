@@ -42,9 +42,11 @@ public class JwtFilter implements Filter {
                 if (jwtUtil.validateToken(token)) {
                     CurrentUser user = jwtUtil.parseToken(token);
                     UserContextHolder.set(user);
+                    chain.doFilter(servletRequest, servletResponse);
+                    return;
                 }
             }
-            chain.doFilter(servletRequest, servletResponse);
+            ((HttpServletResponse) servletResponse).sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
         } finally {
             UserContextHolder.clear();
         }

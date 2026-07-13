@@ -1,8 +1,6 @@
 package org.liar.zhiliao.ingestion.service;
 
-import dev.langchain4j.data.segment.TextSegment;
-
-import java.util.List;
+import org.liar.zhiliao.ingestion.records.ParentChildSplitResult;
 
 /**
  * Document splitting interface.
@@ -11,5 +9,5 @@ import java.util.List;
  *         ParentChildDocumentSplitter (Parent 2048t + Child 512t)
  */
 public interface RecursiveDocumentSplitter {
-    List<TextSegment> split(String text, String documentId);
+    ParentChildSplitResult split(String text, String documentId);
 }

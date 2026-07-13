@@ -35,20 +35,20 @@ langchain4j:
       api-key: ${DEEPSEEK_API_KEY}
       model-name: deepseek-v4-flash
       log-requests: true
-#      log-responses: true
+      log-responses: true
     streaming-chat-model:
       base-url: https://api.deepseek.com
       api-key: ${DEEPSEEK_API_KEY}
       model-name: deepseek-v4-flash
       log-requests: true
-#      log-responses: true
+      log-responses: true
     embedding-model:
       base-url: https://llm-kyz5903txm3fyz8f.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
       api-key: ${QWEN_API_KEY}
       model-name: text-embedding-v4
       max-segments-per-batch: 10
       log-requests: true
-#      log-responses: true
+      log-responses: true
   milvus:
     host: ${RESOURCE_SERVER_HOST}
     port: 19530
@@ -70,7 +70,7 @@ mybatis-plus:
 logging:
   level:
     dev.langchain4j: debug
-    org.liar.zhiliao.retrieval.service: debug
+    org.liar.zhiliao.retrieval: debug
 #    org.springframework.context.support.DefaultListableBeanFactory: debug
 
 # zhiliao custom config

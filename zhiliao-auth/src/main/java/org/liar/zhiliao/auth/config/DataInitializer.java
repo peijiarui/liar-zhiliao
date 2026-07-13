@@ -16,7 +16,7 @@ import java.util.Map;
  * 避免 data.sql 中硬编码 hash 不匹配的问题。
  */
 @Slf4j
-@Component
+//@Component
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 

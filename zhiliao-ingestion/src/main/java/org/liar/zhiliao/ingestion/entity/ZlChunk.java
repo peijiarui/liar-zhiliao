@@ -23,6 +23,11 @@ public class ZlChunk {
     @TableField(typeHandler = org.liar.zhiliao.ingestion.config.JsonbTypeHandler.class)
     private String metadata;
 
+    private Long parentId;
+
+    @Builder.Default
+    private String chunkType = "child";
+
     @Builder.Default
     private String tenantId = "default";
 
