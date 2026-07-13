@@ -92,6 +92,12 @@ CREATE TABLE IF NOT EXISTS zl_conversation (
     created_at      TIMESTAMPTZ       DEFAULT NOW()
 );
 
+-- 6. Conversations (chat sessions) — 追加字段
+ALTER TABLE zl_conversation ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE zl_conversation ADD UNIQUE (memory_id);
+
+COMMENT ON COLUMN zl_conversation.updated_at IS '最后活动时间，每次收发消息时更新，对话列表按此字段降序排列';
+
 -- 7. Audit Logs
 -- =============================================================================
 
