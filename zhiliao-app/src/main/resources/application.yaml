@@ -82,3 +82,19 @@ zhiliao:
     bucket: zhiliao-docs
   rabbitmq:
     queue: zhiliao.document.process
+
+# OAuth2 登录配置
+oauth2:
+  github:
+    client-id: ${GITHUB_CLIENT_ID:}
+    client-secret: ${GITHUB_CLIENT_SECRET:}
+    redirect-uri: http://localhost:8080/oauth2/github/callback
+  dingtalk:
+    app-id: ${DINGTALK_APP_ID:}
+    app-secret: ${DINGTALK_APP_SECRET:}
+    redirect-uri: http://localhost:8080/oauth2/dingtalk/callback
+  wechat:
+    # 预留，暂不启用
+    app-id: ${WECHAT_APP_ID:}
+    app-secret: ${WECHAT_APP_SECRET:}
+    redirect-uri: http://localhost:8080/oauth2/wechat/callback
