@@ -126,10 +126,19 @@ public class OAuth2Controller {
                 + "</script></body></html>";
     }
 
-    /** 转为 JS 字符串字面量（含引号），转义双引号与反斜杠 */
+    /** 转为 JS 字符串字面量（含引号），转义反斜杠、双引号及 HTML 上下文敏感字符 */
     private String jsString(String s) {
         if (s == null) return "\"\"";
-        return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        return "\"" + s.replace("\\", "\\\\")
+                       .replace("\"", "\\\"")
+                       .replace("<", "\\u003c")
+                       .replace(">", "\\u003e")
+                       .replace("&", "\\u0026")
+                       .replace("\n", "\\n")
+                       .replace("\r", "\\r")
+                       .replace(" ", "\\u2028")
+                       .replace(" ", "\\u2029")
+               + "\"";
     }
 
     private String generateState() {
