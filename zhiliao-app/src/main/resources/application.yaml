@@ -82,6 +82,11 @@ zhiliao:
     bucket: zhiliao-docs
   rabbitmq:
     queue: zhiliao.document.process
+  auth:
+    app-id: zhiliao                         # SSO 应用标识，预留多应用
+    access-token-ttl-seconds: 900           # 15 min
+    refresh-token-ttl-seconds: 604800       # 7 day
+    oauth-state-ttl-seconds: 300            # 5 min
 
 # OAuth2 登录配置
 oauth2:
