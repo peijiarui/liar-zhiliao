@@ -4,22 +4,22 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.liar.zhiliao.auth.config.AuthProperties;
+import org.liar.zhiliao.auth.entity.SysUser;
 import org.liar.zhiliao.auth.oauth2.OAuth2Authenticator;
 import org.liar.zhiliao.auth.oauth2.OAuth2Config;
 import org.liar.zhiliao.auth.oauth2.OAuth2UserInfo;
 import org.liar.zhiliao.auth.service.DeptPermissionService;
 import org.liar.zhiliao.auth.service.UserLinkService;
-import org.liar.zhiliao.auth.entity.SysUser;
 import org.liar.zhiliao.auth.session.TokenPair;
 import org.liar.zhiliao.auth.session.TokenService;
 import org.liar.zhiliao.common.model.CurrentUser;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
@@ -30,7 +30,7 @@ import java.util.Map;
  * OAuth2 登录控制器。
  * 统一处理 GitHub 和钉钉的授权回调，通过 provider 路径变量路由到对应认证器。
  * state 存 Redis（TTL 5min），回调时校验后立即删除，防 CSRF。
- * 回调成功后返回 HTML 页面，由前端脚本写入 localStorage 后跳转。
+ * 回调成功后 302 重定向到前端 /oauth/callback，token 通过 URL fragment 传递。
  */
 @Slf4j
 @RestController
@@ -49,7 +49,9 @@ public class OAuth2Controller {
     private final AuthProperties authProps;
     private final StringRedisTemplate redis;
 
-    /** GET /oauth2/github — 302 跳转 GitHub 授权页（state 写入 Redis） */
+    /**
+     * GET /oauth2/github — 302 跳转 GitHub 授权页（state 写入 Redis）
+     */
     @GetMapping("/github")
     public void githubAuthorize(HttpServletResponse response) throws IOException {
         OAuth2Config.ProviderConfig github = config.getGithub();
@@ -63,7 +65,9 @@ public class OAuth2Controller {
         response.sendRedirect(url);
     }
 
-    /** GET /oauth2/dingtalk/authorize — 返回带 state 的钉钉扫码 URL */
+    /**
+     * GET /oauth2/dingtalk/authorize — 返回带 state 的钉钉扫码 URL
+     */
     @GetMapping("/dingtalk/authorize")
     public ResponseEntity<Map<String, String>> dingtalkAuthorizeUrl() {
         OAuth2Config.ProviderConfig dingtalk = config.getDingtalk();
@@ -77,7 +81,9 @@ public class OAuth2Controller {
         return ResponseEntity.ok(Map.of("authUrl", url));
     }
 
-    /** GET /oauth2/{provider}/callback — OAuth2 统一回调入口，返回 HTML 注入 token */
+    /**
+     * GET /oauth2/{provider}/callback — OAuth2 统一回调入口，返回 HTML 注入 token
+     */
     @GetMapping("/{provider}/callback")
     public void callback(@PathVariable String provider,
                          @RequestParam("code") String code,
@@ -108,37 +114,14 @@ public class OAuth2Controller {
         log.info("OAuth login success: provider={}, userId={}, username={}",
                 provider, user.getId(), user.getUsername());
 
-        // 返回 HTML 页面，脚本写入 localStorage 后跳转首页
-        response.setContentType(MediaType.TEXT_HTML_VALUE);
-        response.setCharacterEncoding("UTF-8");
-        String html = buildCallbackHtml(pair);
-        response.getWriter().write(html);
-    }
-
-    private String buildCallbackHtml(TokenPair pair) {
-        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>登录中</title></head><body>"
-                + "<p>登录成功，正在跳转...</p>"
-                + "<script>"
-                + "localStorage.setItem('accessToken'," + jsString(pair.accessToken()) + ");"
-                + "localStorage.setItem('refreshToken'," + jsString(pair.refreshToken()) + ");"
-                + "localStorage.setItem('username'," + jsString(pair.user().username()) + ");"
-                + "window.location.href='/';"
-                + "</script></body></html>";
-    }
-
-    /** 转为 JS 字符串字面量（含引号），转义反斜杠、双引号及 HTML 上下文敏感字符 */
-    private String jsString(String s) {
-        if (s == null) return "\"\"";
-        return "\"" + s.replace("\\", "\\\\")
-                       .replace("\"", "\\\"")
-                       .replace("<", "\\u003c")
-                       .replace(">", "\\u003e")
-                       .replace("&", "\\u0026")
-                       .replace("\n", "\\n")
-                       .replace("\r", "\\r")
-                       .replace(" ", "\\u2028")
-                       .replace(" ", "\\u2029")
-               + "\"";
+        // 302 重定向到前端 /oauth/callback，token 通过 URL fragment 传递
+        // fragment (# 后) 不会发到服务器，也不会被代理/日志记录，比 query 更安全
+        String redirectUrl = authProps.getWebFrontendBaseUrl()
+                + "/#/oauth/callback"
+                + "?accessToken=" + URLEncoder.encode(pair.accessToken(), StandardCharsets.UTF_8)
+                + "&refreshToken=" + URLEncoder.encode(pair.refreshToken(), StandardCharsets.UTF_8)
+                + "&username=" + URLEncoder.encode(pair.user().username(), StandardCharsets.UTF_8);
+        response.sendRedirect(redirectUrl);
     }
 
     private String generateState() {

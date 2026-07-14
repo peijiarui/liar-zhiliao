@@ -20,4 +20,6 @@ public class AuthProperties {
     private long refreshTokenTtlSeconds = 604800L;
     /** OAuth state 参数有效期（秒），默认 5 分钟 */
     private long oauthStateTtlSeconds = 300L;
+    /** 前端站点根地址，OAuth 回调跳转用 */
+    private String webFrontendBaseUrl;
 }

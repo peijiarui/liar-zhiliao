@@ -87,6 +87,7 @@ zhiliao:
     access-token-ttl-seconds: 900           # 15 min
     refresh-token-ttl-seconds: 604800       # 7 day
     oauth-state-ttl-seconds: 300            # 5 min
+    web-frontend-base-url: ${WEB_FRONTEND_BASE_URL:http://localhost:5173}
 
 # OAuth2 登录配置
 oauth2:
