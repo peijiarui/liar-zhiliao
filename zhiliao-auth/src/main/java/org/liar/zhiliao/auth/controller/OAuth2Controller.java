@@ -28,6 +28,7 @@ import java.util.UUID;
  */
 @Slf4j
 @RestController
+@RequestMapping("/oauth2")
 @RequiredArgsConstructor
 public class OAuth2Controller {
 
@@ -38,7 +39,7 @@ public class OAuth2Controller {
     private final OAuth2Config config;
 
     /** GET /oauth2/github — 302 跳转 GitHub 授权页（含 state CSRF 保护） */
-    @GetMapping("/oauth2/github")
+    @GetMapping("/github")
     public void githubAuthorize(HttpServletRequest request, HttpServletResponse response) throws IOException {
         OAuth2Config.ProviderConfig github = config.getGithub();
         String state = UUID.randomUUID().toString();
@@ -50,7 +51,7 @@ public class OAuth2Controller {
     }
 
     /** GET /oauth2/{provider}/callback — OAuth2 统一回调入口 */
-    @GetMapping("/oauth2/{provider}/callback")
+    @GetMapping("/{provider}/callback")
     public void callback(@PathVariable String provider, @RequestParam("code") String code,
                          @RequestParam(value = "state", required = false) String state,
                          HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -84,13 +85,13 @@ public class OAuth2Controller {
         Cookie jwtCookie = new Cookie("zhiliao_token", token);
         jwtCookie.setPath("/");
         jwtCookie.setHttpOnly(true);
-        jwtCookie.setMaxAge(86400); // 1 day
+        jwtCookie.setMaxAge(60 * 60); // 1 hour
         response.addCookie(jwtCookie);
-        response.sendRedirect("/");
+        response.sendRedirect("http://localhost:5173"); // 跳转到前端
     }
 
     /** GET /oauth2/dingtalk/authorize — 返回钉钉扫码授权 URL（前端生成二维码用） */
-    @GetMapping("/oauth2/dingtalk/authorize")
+    @GetMapping("/dingtalk/authorize")
     public ResponseEntity<Map<String, String>> dingtalkAuthorizeUrl() {
         OAuth2Config.ProviderConfig dingtalk = config.getDingtalk();
         String url = String.format(

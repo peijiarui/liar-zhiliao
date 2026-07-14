@@ -30,8 +30,8 @@ public class JwtFilter implements Filter {
         HttpServletResponse response = (HttpServletResponse) servletResponse;
         String path = request.getRequestURI();
 
-        // Skip auth for login and OAuth2 endpoints
-        if (path.equals("/api/auth/login") || path.startsWith("/oauth2/")) {
+        // Skip auth for login, logout and OAuth2 endpoints
+        if (path.equals("/api/auth/login") || path.equals("/api/auth/logout") || path.startsWith("/oauth2/")) {
             chain.doFilter(servletRequest, servletResponse);
             return;
         }

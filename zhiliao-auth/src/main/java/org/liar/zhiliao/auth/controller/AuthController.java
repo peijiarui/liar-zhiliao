@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 
 @Slf4j
@@ -22,6 +23,8 @@ public class AuthController {
 
     private final UserService userService;
     private final JwtUtil jwtUtil;
+
+    private static final String TOKEN_COOKIE_NAME = "zhiliao_token";
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> request) {
@@ -39,6 +42,20 @@ public class AuthController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletResponse response) {
+        log.info("===== 登出 =====");
+
+        // 清除 zhiliao_token cookie（OAuth 登录场景下 JS 无法清除 HttpOnly cookie，必须由后端清）
+        Cookie expired = new Cookie(TOKEN_COOKIE_NAME, "");
+        expired.setPath("/");
+        expired.setHttpOnly(true);
+        expired.setMaxAge(0);
+        response.addCookie(expired);
+
+        return ResponseEntity.ok(Map.of("success", true));
     }
 
     /** GET /api/auth/me — 获取当前登录用户信息（从 cookie 或 Bearer header 恢复 session） */

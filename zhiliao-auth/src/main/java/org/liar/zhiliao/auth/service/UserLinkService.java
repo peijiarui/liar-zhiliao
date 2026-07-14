@@ -3,6 +3,7 @@ package org.liar.zhiliao.auth.service;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.liar.zhiliao.auth.entity.SysOauthLink;
 import org.liar.zhiliao.auth.entity.SysUser;
 import org.liar.zhiliao.auth.mapper.SysOauthLinkMapper;
@@ -42,7 +43,7 @@ public class UserLinkService {
         }
 
         // 2. 邮箱非空 → 尝试按邮箱合并
-        if (userInfo.email() != null && !userInfo.email().isBlank()) {
+        if (StringUtils.isNotBlank(userInfo.email())) {
             SysUser userByEmail = userMapper.selectOne(
                     Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, userInfo.email()));
             if (userByEmail != null) {

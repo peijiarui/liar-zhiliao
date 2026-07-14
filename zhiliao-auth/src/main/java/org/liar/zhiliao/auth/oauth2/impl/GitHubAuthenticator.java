@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.liar.zhiliao.auth.oauth2.OAuth2Authenticator;
 import org.liar.zhiliao.auth.oauth2.OAuth2Config;
 import org.liar.zhiliao.auth.oauth2.OAuth2UserInfo;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -44,6 +45,7 @@ public class GitHubAuthenticator implements OAuth2Authenticator {
     }
 
     private String getAccessToken(String code) {
+        log.info("======开始获取github access_token======");
         OAuth2Config.ProviderConfig github = config.getGithub();
         HttpHeaders headers = new HttpHeaders();
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
@@ -55,8 +57,12 @@ public class GitHubAuthenticator implements OAuth2Authenticator {
         body.add("redirect_uri", github.getRedirectUri());
 
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
-        ResponseEntity<Map> response = restTemplate.postForEntity(
-                "https://github.com/login/oauth/access_token", request, Map.class);
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                "https://github.com/login/oauth/access_token",
+                HttpMethod.POST,
+                request,
+                new ParameterizedTypeReference<>() {}
+        );
 
         Map<String, Object> result = response.getBody();
         if (result == null || !result.containsKey("access_token")) {
@@ -66,22 +72,28 @@ public class GitHubAuthenticator implements OAuth2Authenticator {
     }
 
     private Map<String, Object> getUserInfo(String accessToken) {
+        log.info("======开始获取github用户信息======");
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
         HttpEntity<Void> request = new HttpEntity<>(headers);
-        ResponseEntity<Map> response = restTemplate.exchange(
-                "https://api.github.com/user", HttpMethod.GET, request, Map.class);
+        // 使用 ParameterizedTypeReference 明确指定返回的泛型类型
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                "https://api.github.com/user",
+                HttpMethod.GET,
+                request,
+                new ParameterizedTypeReference<>() {});
+
         return response.getBody();
     }
 
-    @SuppressWarnings("unchecked")
     private String getPrimaryEmail(String accessToken) {
         try {
+            log.info("======开始获取github用户邮箱信息======");
             HttpHeaders headers = new HttpHeaders();
             headers.setBearerAuth(accessToken);
             HttpEntity<Void> request = new HttpEntity<>(headers);
-            ResponseEntity<List> response = restTemplate.exchange(
-                    "https://api.github.com/user/emails", HttpMethod.GET, request, List.class);
+            ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
+                    "https://api.github.com/user/emails", HttpMethod.GET, request, new ParameterizedTypeReference<>() {});
             List<Map<String, Object>> emails = response.getBody();
             if (emails != null) {
                 for (Map<String, Object> email : emails) {

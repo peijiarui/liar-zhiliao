@@ -86,8 +86,8 @@ zhiliao:
 # OAuth2 登录配置
 oauth2:
   github:
-    client-id: ${GITHUB_CLIENT_ID:}
-    client-secret: ${GITHUB_CLIENT_SECRET:}
+    client-id: ${GITHUB_CLIENT_ID:Ov23liOn92VGSxEUXAL1}
+    client-secret: ${GITHUB_CLIENT_SECRET:6819718894767529b40e0da777f30e1ff5ffe471}
     redirect-uri: http://localhost:8080/oauth2/github/callback
   dingtalk:
     client-id: ${DINGTALK_APP_ID:}
