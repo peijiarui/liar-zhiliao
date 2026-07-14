@@ -1,30 +1,36 @@
 package org.liar.zhiliao.auth.controller;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.liar.zhiliao.auth.config.AuthProperties;
 import org.liar.zhiliao.auth.oauth2.OAuth2Authenticator;
 import org.liar.zhiliao.auth.oauth2.OAuth2Config;
 import org.liar.zhiliao.auth.oauth2.OAuth2UserInfo;
 import org.liar.zhiliao.auth.service.DeptPermissionService;
 import org.liar.zhiliao.auth.service.UserLinkService;
 import org.liar.zhiliao.auth.entity.SysUser;
+import org.liar.zhiliao.auth.session.TokenPair;
+import org.liar.zhiliao.auth.session.TokenService;
 import org.liar.zhiliao.common.model.CurrentUser;
-import org.liar.zhiliao.common.utils.JwtUtil;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.security.SecureRandom;
+import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * OAuth2 登录控制器。
  * 统一处理 GitHub 和钉钉的授权回调，通过 provider 路径变量路由到对应认证器。
+ * state 存 Redis（TTL 5min），回调时校验后立即删除，防 CSRF。
+ * 回调成功后返回 HTML 页面，由前端脚本写入 localStorage 后跳转。
  */
 @Slf4j
 @RestController
@@ -32,40 +38,59 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OAuth2Controller {
 
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final Base64.Encoder URL_ENCODER = Base64.getUrlEncoder().withoutPadding();
+
     private final List<OAuth2Authenticator> authenticators;
     private final UserLinkService userLinkService;
     private final DeptPermissionService deptPermissionService;
-    private final JwtUtil jwtUtil;
+    private final TokenService tokenService;
     private final OAuth2Config config;
+    private final AuthProperties authProps;
+    private final StringRedisTemplate redis;
 
-    /** GET /oauth2/github — 302 跳转 GitHub 授权页（含 state CSRF 保护） */
+    /** GET /oauth2/github — 302 跳转 GitHub 授权页（state 写入 Redis） */
     @GetMapping("/github")
-    public void githubAuthorize(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    public void githubAuthorize(HttpServletResponse response) throws IOException {
         OAuth2Config.ProviderConfig github = config.getGithub();
-        String state = UUID.randomUUID().toString();
-        request.getSession(true).setAttribute("oauth_state", state);
+        String state = generateState();
+        redis.opsForValue().set(stateKey(state), "github",
+                Duration.ofSeconds(authProps.getOauthStateTtlSeconds()));
+
         String url = String.format(
                 "https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=user:email&state=%s",
                 github.getClientId(), github.getRedirectUri(), state);
         response.sendRedirect(url);
     }
 
-    /** GET /oauth2/{provider}/callback — OAuth2 统一回调入口 */
+    /** GET /oauth2/dingtalk/authorize — 返回带 state 的钉钉扫码 URL */
+    @GetMapping("/dingtalk/authorize")
+    public ResponseEntity<Map<String, String>> dingtalkAuthorizeUrl() {
+        OAuth2Config.ProviderConfig dingtalk = config.getDingtalk();
+        String state = generateState();
+        redis.opsForValue().set(stateKey(state), "dingtalk",
+                Duration.ofSeconds(authProps.getOauthStateTtlSeconds()));
+
+        String url = String.format(
+                "https://login.dingtalk.com/oauth2/auth?redirect_uri=%s&response_type=code&client_id=%s&scope=openid&prompt=consent&state=%s",
+                dingtalk.getRedirectUri(), dingtalk.getClientId(), state);
+        return ResponseEntity.ok(Map.of("authUrl", url));
+    }
+
+    /** GET /oauth2/{provider}/callback — OAuth2 统一回调入口，返回 HTML 注入 token */
     @GetMapping("/{provider}/callback")
-    public void callback(@PathVariable String provider, @RequestParam("code") String code,
+    public void callback(@PathVariable String provider,
+                         @RequestParam("code") String code,
                          @RequestParam(value = "state", required = false) String state,
-                         HttpServletRequest request, HttpServletResponse response) throws IOException {
-        // 仅对 GitHub OAuth 验证 state 参数（CSRF 保护）
-        if ("github".equals(provider)) {
-            HttpSession session = request.getSession(false);
-            String savedState = (session != null) ? (String) session.getAttribute("oauth_state") : null;
-            if (savedState == null || !savedState.equals(state)) {
-                log.warn("OAuth state mismatch: provider={}, expected={}, actual={}", provider, savedState, state);
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid OAuth state parameter");
-                return;
-            }
-            session.removeAttribute("oauth_state");
+                         HttpServletResponse response) throws IOException {
+        // 校验 state（GitHub 和钉钉都强制校验）
+        String storedProvider = redis.opsForValue().get(stateKey(state));
+        if (storedProvider == null || !storedProvider.equals(provider)) {
+            log.warn("OAuth state mismatch: provider={}, state={}", provider, state);
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid OAuth state");
+            return;
         }
+        redis.delete(stateKey(state));  // 立即删除防重放
 
         OAuth2Authenticator authenticator = authenticators.stream()
                 .filter(a -> a.provider().equals(provider))
@@ -76,27 +101,44 @@ public class OAuth2Controller {
         SysUser user = userLinkService.linkOrCreate(userInfo, provider);
 
         List<Long> visibleDeptIds = deptPermissionService.getVisibleDeptIds(user.getDeptId());
-        CurrentUser currentUser = CurrentUser.of(user.getId(), user.getUsername(), user.getDeptId(), visibleDeptIds);
-        String token = jwtUtil.generateToken(currentUser);
+        CurrentUser currentUser = CurrentUser.of(
+                user.getId(), user.getUsername(), user.getDeptId(), visibleDeptIds);
+        TokenPair pair = tokenService.issue(currentUser);
 
-        log.info("OAuth login success: provider={}, userId={}, username={}", provider, user.getId(), user.getUsername());
+        log.info("OAuth login success: provider={}, userId={}, username={}",
+                provider, user.getId(), user.getUsername());
 
-        // 302 重定向到首页，JWT 通过 Cookie 传递
-        Cookie jwtCookie = new Cookie("zhiliao_token", token);
-        jwtCookie.setPath("/");
-        jwtCookie.setHttpOnly(true);
-        jwtCookie.setMaxAge(60 * 60); // 1 hour
-        response.addCookie(jwtCookie);
-        response.sendRedirect("http://localhost:5173"); // 跳转到前端
+        // 返回 HTML 页面，脚本写入 localStorage 后跳转首页
+        response.setContentType(MediaType.TEXT_HTML_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        String html = buildCallbackHtml(pair);
+        response.getWriter().write(html);
     }
 
-    /** GET /oauth2/dingtalk/authorize — 返回钉钉扫码授权 URL（前端生成二维码用） */
-    @GetMapping("/dingtalk/authorize")
-    public ResponseEntity<Map<String, String>> dingtalkAuthorizeUrl() {
-        OAuth2Config.ProviderConfig dingtalk = config.getDingtalk();
-        String url = String.format(
-                "https://login.dingtalk.com/oauth2/auth?redirect_uri=%s&response_type=code&client_id=%s&scope=openid&prompt=consent",
-                dingtalk.getRedirectUri(), dingtalk.getClientId());
-        return ResponseEntity.ok(Map.of("authUrl", url));
+    private String buildCallbackHtml(TokenPair pair) {
+        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>登录中</title></head><body>"
+                + "<p>登录成功，正在跳转...</p>"
+                + "<script>"
+                + "localStorage.setItem('accessToken'," + jsString(pair.accessToken()) + ");"
+                + "localStorage.setItem('refreshToken'," + jsString(pair.refreshToken()) + ");"
+                + "localStorage.setItem('username'," + jsString(pair.user().username()) + ");"
+                + "window.location.href='/';"
+                + "</script></body></html>";
+    }
+
+    /** 转为 JS 字符串字面量（含引号），转义双引号与反斜杠 */
+    private String jsString(String s) {
+        if (s == null) return "\"\"";
+        return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    }
+
+    private String generateState() {
+        byte[] bytes = new byte[16];
+        SECURE_RANDOM.nextBytes(bytes);
+        return URL_ENCODER.encodeToString(bytes);
+    }
+
+    private String stateKey(String state) {
+        return "auth:oauth:state:" + authProps.getAppId() + ":" + state;
     }
 }
