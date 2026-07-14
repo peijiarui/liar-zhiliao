@@ -98,6 +98,10 @@ mvn dependency:tree
 | `application.yaml` | zhiliao-app | 应用配置（DeepSeek、Redis、日志等） |
 | `system-prompt.md` | zhiliao-chat | 系统提示词，定义 AI 角色 |
 | `LiarZhiliaApplication.java` | zhiliao-app | Spring Boot 启动入口 |
+| `TokenService.java` | zhiliao-auth | token 生成/查询/吊销/刷新（Redis 存储） |
+| `SessionFilter.java` | zhiliao-auth | 从 Authorization 头校验 access token |
+| `SessionData.java` | zhiliao-auth | access token 在 Redis 中的会话结构 |
+| `AuthProperties.java` | zhiliao-auth | 读取 zhiliao.auth.* 配置 |
 
 ## 添加工具调用
 
@@ -108,3 +112,6 @@ mvn dependency:tree
 ## 约束
 
 1. 不要主动执行 `git` 命令，需要用户自行执行
+2. Access Token TTL 15min，Refresh Token TTL 7day，OAuth state TTL 5min
+3. Refresh Token Rotation：每次 refresh 同时换新 access 和 refresh token
+4. OAuth 回调必须返回 HTML 页面（脚本写 localStorage），禁止 setCookie
