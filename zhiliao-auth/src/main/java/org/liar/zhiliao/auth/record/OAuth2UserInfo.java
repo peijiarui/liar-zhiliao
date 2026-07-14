@@ -1,4 +1,4 @@
-package org.liar.zhiliao.auth.oauth2;
+package org.liar.zhiliao.auth.record;
 
 /**
  * OAuth2 认证成功后返回的用户信息。

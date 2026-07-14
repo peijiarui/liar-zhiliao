@@ -8,7 +8,7 @@ import org.liar.zhiliao.auth.entity.SysOauthLink;
 import org.liar.zhiliao.auth.entity.SysUser;
 import org.liar.zhiliao.auth.mapper.SysOauthLinkMapper;
 import org.liar.zhiliao.auth.mapper.SysUserMapper;
-import org.liar.zhiliao.auth.oauth2.OAuth2UserInfo;
+import org.liar.zhiliao.auth.record.OAuth2UserInfo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,20 +45,20 @@ public class UserLinkService {
         // 2. 邮箱非空 → 尝试按邮箱合并
         if (StringUtils.isNotBlank(userInfo.email())) {
             SysUser userByEmail = userMapper.selectOne(
-                    Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, userInfo.email()));
+                    Wrappers.<SysUser>lambdaQuery().eq(SysUser::getLoginName, userInfo.name()));
             if (userByEmail != null) {
                 createOauthLink(userByEmail.getId(), provider, userInfo);
                 return userByEmail;
             }
         }
 
-        // 3. 创建新用户，用户名用邮箱或 provider+providerUserId
-        String username = (userInfo.email() != null && !userInfo.email().isBlank())
-                ? userInfo.email()
-                : provider + "_" + userInfo.providerUserId();
+        // 3. 创建新用户，登录名用邮箱或 provider+providerUserId
+        String loginName = StringUtils.isNotBlank(userInfo.name()) ? userInfo.name() : provider + "_" + userInfo.providerUserId();
         SysUser newUser = SysUser.builder()
-                .username(username)
+                .loginName(loginName)
                 .passwordHash("")  // OAuth 用户无密码
+                .name(userInfo.name())
+                .email(userInfo.email())
                 .role("USER")
                 .tenantId("default")
                 .deptId(1L)
@@ -66,7 +66,7 @@ public class UserLinkService {
         userMapper.insert(newUser);
 
         createOauthLink(newUser.getId(), provider, userInfo);
-        log.info("Created new user from OAuth: provider={}, username={}", provider, username);
+        log.info("Created new user from OAuth: provider={}, loginName={}, name={}", provider, loginName, userInfo.name());
         return newUser;
     }
 

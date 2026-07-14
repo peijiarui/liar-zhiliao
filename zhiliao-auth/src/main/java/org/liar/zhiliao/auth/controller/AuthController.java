@@ -4,9 +4,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.liar.zhiliao.auth.entity.SysUser;
-import org.liar.zhiliao.auth.session.SessionData;
-import org.liar.zhiliao.auth.session.TokenPair;
-import org.liar.zhiliao.auth.session.TokenService;
+import org.liar.zhiliao.auth.record.SessionData;
+import org.liar.zhiliao.auth.record.TokenPair;
+import org.liar.zhiliao.auth.service.TokenService;
 import org.liar.zhiliao.auth.service.UserService;
 import org.liar.zhiliao.common.model.CurrentUser;
 import org.liar.zhiliao.common.utils.UserContextHolder;
@@ -28,26 +28,30 @@ public class AuthController {
     private final UserService userService;
     private final TokenService tokenService;
 
-    /** POST /api/auth/login — 用户名密码登录，返回 access + refresh token */
+    /**
+     * POST /api/auth/login — 用户名密码登录，返回 access + refresh token
+     */
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> request) {
         try {
-            String username = request.get("username");
+            String loginName = request.get("login_name");
             String password = request.get("password");
 
-            SysUser user = userService.authenticate(username, password);
+            SysUser user = userService.authenticate(loginName, password);
             CurrentUser currentUser = new CurrentUser(
-                    user.getId(), user.getUsername(), user.getDeptId());
-            TokenPair pair = tokenService.issue(currentUser);
+                    user.getId(), user.getLoginName(), user.getName(), user.getDeptId());
+            TokenPair pair = tokenService.issueToken(currentUser);
 
-            log.info("登录成功: userId={}, username={}", user.getId(), user.getUsername());
+            log.info("登录成功: userId={}, loginName={}", user.getId(), user.getLoginName());
             return ResponseEntity.ok(pair);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
         }
     }
 
-    /** POST /api/auth/logout — 吊销当前 access token 及关联 refresh token */
+    /**
+     * POST /api/auth/logout — 吊销当前 access token 及关联 refresh token
+     */
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletRequest request) {
         String accessToken = extractBearer(request);
@@ -58,7 +62,9 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("success", true));
     }
 
-    /** GET /api/auth/me — 获取当前登录用户信息 */
+    /**
+     * GET /api/auth/me — 获取当前登录用户信息
+     */
     @GetMapping("/me")
     public ResponseEntity<?> me(HttpServletRequest request) {
         CurrentUser currentUser = UserContextHolder.get();
@@ -71,14 +77,17 @@ public class AuthController {
 
         return ResponseEntity.ok(Map.of(
                 "id", currentUser.id(),
-                "username", currentUser.username(),
+                "loginName", currentUser.loginName(),
+                "name", currentUser.name(),
                 "deptId", currentUser.deptId(),
                 "visibleDeptIds", currentUser.visibleDeptIds(),
                 "expiresAt", expiresAt
         ));
     }
 
-    /** POST /api/auth/refresh — 用 refresh token 换新 access + refresh token */
+    /**
+     * POST /api/auth/refresh — 用 refresh token 换新 access + refresh token
+     */
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@RequestBody Map<String, String> request) {
         String refreshToken = request.get("refreshToken");

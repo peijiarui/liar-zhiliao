@@ -15,11 +15,11 @@ public class AuthProperties {
     /** SSO 应用标识，预留多应用共享 session 时区分 */
     private String appId = "zhiliao";
     /** Access Token 有效期（秒），默认 15 分钟 */
-    private long accessTokenTtlSeconds = 900L;
+    private long accessTokenTtlSeconds = 15 * 60;
     /** Refresh Token 有效期（秒），默认 7 天 */
-    private long refreshTokenTtlSeconds = 604800L;
+    private long refreshTokenTtlSeconds = 7 * 24 * 3600;
     /** OAuth state 参数有效期（秒），默认 5 分钟 */
-    private long oauthStateTtlSeconds = 300L;
+    private long oauthStateTtlSeconds = 5 * 60;
     /** 前端站点根地址，OAuth 回调跳转用 */
     private String webFrontendBaseUrl;
 }

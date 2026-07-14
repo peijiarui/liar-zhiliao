@@ -297,9 +297,9 @@ package org.liar.zhiliao.auth.oauth2.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.liar.zhiliao.auth.oauth2.OAuth2Authenticator;
-import org.liar.zhiliao.auth.oauth2.OAuth2Config;
-import org.liar.zhiliao.auth.oauth2.OAuth2UserInfo;
+import org.liar.zhiliao.auth.service.OAuth2Authenticator;
+import org.liar.zhiliao.auth.config.OAuth2Config;
+import org.liar.zhiliao.auth.record.OAuth2UserInfo;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -400,9 +400,9 @@ package org.liar.zhiliao.auth.oauth2.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.liar.zhiliao.auth.oauth2.OAuth2Authenticator;
-import org.liar.zhiliao.auth.oauth2.OAuth2Config;
-import org.liar.zhiliao.auth.oauth2.OAuth2UserInfo;
+import org.liar.zhiliao.auth.service.OAuth2Authenticator;
+import org.liar.zhiliao.auth.config.OAuth2Config;
+import org.liar.zhiliao.auth.record.OAuth2UserInfo;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -478,8 +478,8 @@ public class DingTalkAuthenticator implements OAuth2Authenticator {
 ```java
 package org.liar.zhiliao.auth.oauth2.impl;
 
-import org.liar.zhiliao.auth.oauth2.OAuth2Authenticator;
-import org.liar.zhiliao.auth.oauth2.OAuth2UserInfo;
+import org.liar.zhiliao.auth.service.OAuth2Authenticator;
+import org.liar.zhiliao.auth.record.OAuth2UserInfo;
 
 /**
  * 微信扫码登录认证器（预留）。
@@ -539,7 +539,7 @@ import org.liar.zhiliao.auth.entity.SysOauthLink;
 import org.liar.zhiliao.auth.entity.SysUser;
 import org.liar.zhiliao.auth.mapper.SysOauthLinkMapper;
 import org.liar.zhiliao.auth.mapper.SysUserMapper;
-import org.liar.zhiliao.auth.oauth2.OAuth2UserInfo;
+import org.liar.zhiliao.auth.record.OAuth2UserInfo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -648,9 +648,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.liar.zhiliao.auth.entity.SysUser;
-import org.liar.zhiliao.auth.oauth2.OAuth2Authenticator;
-import org.liar.zhiliao.auth.oauth2.OAuth2Config;
-import org.liar.zhiliao.auth.oauth2.OAuth2UserInfo;
+import org.liar.zhiliao.auth.service.OAuth2Authenticator;
+import org.liar.zhiliao.auth.config.OAuth2Config;
+import org.liar.zhiliao.auth.record.OAuth2UserInfo;
 import org.liar.zhiliao.auth.service.UserLinkService;
 import org.liar.zhiliao.common.model.CurrentUser;
 import org.liar.zhiliao.common.utils.JwtUtil;

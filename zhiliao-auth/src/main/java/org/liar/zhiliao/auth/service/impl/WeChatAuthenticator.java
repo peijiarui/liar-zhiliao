@@ -1,7 +1,7 @@
-package org.liar.zhiliao.auth.oauth2.impl;
+package org.liar.zhiliao.auth.service.impl;
 
-import org.liar.zhiliao.auth.oauth2.OAuth2Authenticator;
-import org.liar.zhiliao.auth.oauth2.OAuth2UserInfo;
+import org.liar.zhiliao.auth.service.OAuth2Authenticator;
+import org.liar.zhiliao.auth.record.OAuth2UserInfo;
 
 /**
  * 微信扫码登录认证器（预留）。

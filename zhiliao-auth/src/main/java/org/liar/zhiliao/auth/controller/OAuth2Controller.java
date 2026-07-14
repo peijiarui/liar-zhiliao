@@ -4,14 +4,14 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.liar.zhiliao.auth.config.AuthProperties;
+import org.liar.zhiliao.auth.config.OAuth2Config;
 import org.liar.zhiliao.auth.entity.SysUser;
-import org.liar.zhiliao.auth.oauth2.OAuth2Authenticator;
-import org.liar.zhiliao.auth.oauth2.OAuth2Config;
-import org.liar.zhiliao.auth.oauth2.OAuth2UserInfo;
+import org.liar.zhiliao.auth.record.OAuth2UserInfo;
+import org.liar.zhiliao.auth.record.TokenPair;
 import org.liar.zhiliao.auth.service.DeptPermissionService;
+import org.liar.zhiliao.auth.service.OAuth2Authenticator;
+import org.liar.zhiliao.auth.service.TokenService;
 import org.liar.zhiliao.auth.service.UserLinkService;
-import org.liar.zhiliao.auth.session.TokenPair;
-import org.liar.zhiliao.auth.session.TokenService;
 import org.liar.zhiliao.common.model.CurrentUser;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
@@ -104,15 +104,15 @@ public class OAuth2Controller {
                 .orElseThrow(() -> new IllegalArgumentException("Unknown OAuth provider: " + provider));
 
         OAuth2UserInfo userInfo = authenticator.authenticate(code);
-        SysUser user = userLinkService.linkOrCreate(userInfo, provider);
+        SysUser user = userLinkService.linkOrCreate(userInfo, provider);    //关联用户或创建
 
         List<Long> visibleDeptIds = deptPermissionService.getVisibleDeptIds(user.getDeptId());
         CurrentUser currentUser = CurrentUser.of(
-                user.getId(), user.getUsername(), user.getDeptId(), visibleDeptIds);
-        TokenPair pair = tokenService.issue(currentUser);
+                user.getId(), user.getLoginName(), user.getName(), user.getDeptId(), visibleDeptIds);
+        TokenPair pair = tokenService.issueToken(currentUser);
 
-        log.info("OAuth login success: provider={}, userId={}, username={}",
-                provider, user.getId(), user.getUsername());
+        log.info("OAuth login success: provider={}, userId={}, loginName={}",
+                provider, user.getId(), user.getLoginName());
 
         // 302 重定向到前端 /oauth/callback，token 通过 URL fragment 传递
         // fragment (# 后) 不会发到服务器，也不会被代理/日志记录，比 query 更安全
@@ -120,7 +120,9 @@ public class OAuth2Controller {
                 + "/#/oauth/callback"
                 + "?accessToken=" + URLEncoder.encode(pair.accessToken(), StandardCharsets.UTF_8)
                 + "&refreshToken=" + URLEncoder.encode(pair.refreshToken(), StandardCharsets.UTF_8)
-                + "&username=" + URLEncoder.encode(pair.user().username(), StandardCharsets.UTF_8);
+                + "&loginName=" + URLEncoder.encode(pair.user().loginName(), StandardCharsets.UTF_8)
+                + "&name=" + URLEncoder.encode(
+                        pair.user().name() != null ? pair.user().name() : "", StandardCharsets.UTF_8);
         response.sendRedirect(redirectUrl);
     }
 

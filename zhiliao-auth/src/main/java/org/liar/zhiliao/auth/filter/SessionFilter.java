@@ -5,8 +5,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.liar.zhiliao.auth.session.SessionData;
-import org.liar.zhiliao.auth.session.TokenService;
+import org.liar.zhiliao.auth.record.SessionData;
+import org.liar.zhiliao.auth.service.TokenService;
 import org.liar.zhiliao.common.model.CurrentUser;
 import org.liar.zhiliao.common.utils.UserContextHolder;
 import org.springframework.core.annotation.Order;
@@ -58,7 +58,7 @@ public class SessionFilter implements Filter {
 
         try {
             CurrentUser user = new CurrentUser(
-                    session.userId(), session.username(),
+                    session.userId(), session.loginName(), session.name(),
                     session.deptId(), session.visibleDeptIds());
             UserContextHolder.set(user);
             chain.doFilter(req, res);

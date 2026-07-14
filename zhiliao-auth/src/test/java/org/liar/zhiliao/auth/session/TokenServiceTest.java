@@ -4,6 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.liar.zhiliao.auth.config.AuthProperties;
+import org.liar.zhiliao.auth.record.RefreshTokenData;
+import org.liar.zhiliao.auth.record.SessionData;
+import org.liar.zhiliao.auth.record.TokenPair;
+import org.liar.zhiliao.auth.service.TokenService;
+import org.liar.zhiliao.auth.service.impl.TokenServiceImpl;
 import org.liar.zhiliao.common.model.CurrentUser;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -28,14 +33,14 @@ class TokenServiceTest {
         redis = mock(StringRedisTemplate.class);
         valueOps = mock(ValueOperations.class);
         when(redis.opsForValue()).thenReturn(valueOps);
-        tokenService = new TokenService(redis, new ObjectMapper(), props);
+        tokenService = new TokenServiceImpl(redis, new ObjectMapper(), props);
     }
 
     @Test
-    void issue_shouldStoreBothTokensAndReturnPair() {
-        CurrentUser user = new CurrentUser(1L, "alice", 2L, List.of(1L, 2L));
+    void issue_Token_shouldStoreBothTokensAndReturnPair() {
+        CurrentUser user = new CurrentUser(1L, "alice", "Alice", 2L, List.of(1L, 2L));
 
-        TokenPair pair = tokenService.issue(user);
+        TokenPair pair = tokenService.issueToken(user);
 
         assertThat(pair.accessToken()).isNotBlank();
         assertThat(pair.refreshToken()).isNotBlank();
@@ -57,7 +62,7 @@ class TokenServiceTest {
     void refresh_shouldRotateRefreshToken() throws Exception {
         // 准备一个已存在的 refresh token
         RefreshTokenData existing = new RefreshTokenData(
-                "old-rt-id", 1L, "alice", 2L, List.of(1L, 2L),
+                "old-rt-id", 1L, "alice", "Alice", 2L, List.of(1L, 2L),
                 System.currentTimeMillis(), System.currentTimeMillis() + 86400000L, false);
         when(valueOps.get(contains("auth:refresh:zhiliao:")))
                 .thenReturn(new ObjectMapper().writeValueAsString(existing));
@@ -71,7 +76,7 @@ class TokenServiceTest {
     @Test
     void refresh_shouldThrowWhenTokenRotated() throws Exception {
         RefreshTokenData rotated = new RefreshTokenData(
-                "rt-id", 1L, "alice", 2L, List.of(1L, 2L),
+                "rt-id", 1L, "alice", "Alice", 2L, List.of(1L, 2L),
                 System.currentTimeMillis(), System.currentTimeMillis() + 86400000L, true);
         when(valueOps.get(contains("auth:refresh:zhiliao:")))
                 .thenReturn(new ObjectMapper().writeValueAsString(rotated));

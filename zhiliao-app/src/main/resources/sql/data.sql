@@ -24,11 +24,11 @@ ON CONFLICT (tenant_id, name) DO NOTHING;
 -- admin gets the ADMIN role; the other two get USER.
 -- The UNIQUE (username) constraint prevents duplicate inserts.
 
-INSERT INTO sys_user (username, password_hash, dept_id, role, tenant_id)
-VALUES ('admin',    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+INSERT INTO sys_user (login_name, password_hash, name, dept_id, role, tenant_id)
+VALUES ('admin',    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '系统管理员',
         (SELECT id FROM sys_department WHERE name = '技术部' AND tenant_id = 'default'), 'ADMIN', 'default'),
-       ('zhangsan', '$2a$10$.J9Dk5kBT0UQxYPfqYq3s.DGQPnwY3Y5GqYI71G2QrMnKN9JGKQTa',
+       ('zhangsan', '$2a$10$.J9Dk5kBT0UQxYPfqYq3s.DGQPnwY3Y5GqYI71G2QrMnKN9JGKQTa', '张三',
         (SELECT id FROM sys_department WHERE name = '产品部' AND tenant_id = 'default'), 'USER',  'default'),
-       ('lisi',     '$2a$10$.J9Dk5kBT0UQxYPfqYq3s.DGQPnwY3Y5GqYI71G2QrMnKN9JGKQTa',
+       ('lisi',     '$2a$10$.J9Dk5kBT0UQxYPfqYq3s.DGQPnwY3Y5GqYI71G2QrMnKN9JGKQTa', '李四',
         (SELECT id FROM sys_department WHERE name = '运营部' AND tenant_id = 'default'), 'USER',  'default')
-ON CONFLICT (username) DO NOTHING;
+ON CONFLICT (login_name) DO NOTHING;

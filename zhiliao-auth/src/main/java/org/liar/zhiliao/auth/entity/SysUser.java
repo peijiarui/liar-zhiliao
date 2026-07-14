@@ -15,9 +15,15 @@ public class SysUser {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private String username;
+    private String loginName;
 
     private String passwordHash;
+
+    private String name;
+
+    private String email;
+
+    private String phone;
 
     @Builder.Default
     private Long deptId = 1L;

@@ -8,6 +8,6 @@ import org.liar.zhiliao.auth.entity.SysUser;
  */
 public interface UserService {
 
-    SysUser authenticate(String username, String password);
+    SysUser authenticate(String loginName, String password);
 
 }

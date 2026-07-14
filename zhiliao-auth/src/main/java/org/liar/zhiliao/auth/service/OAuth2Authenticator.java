@@ -1,4 +1,6 @@
-package org.liar.zhiliao.auth.oauth2;
+package org.liar.zhiliao.auth.service;
+
+import org.liar.zhiliao.auth.record.OAuth2UserInfo;
 
 /**
  * OAuth2 认证器接口。

@@ -1,4 +1,4 @@
-package org.liar.zhiliao.auth.session;
+package org.liar.zhiliao.auth.record;
 
 import java.util.List;
 
@@ -9,7 +9,8 @@ import java.util.List;
 public record RefreshTokenData(
         String tokenId,
         Long userId,
-        String username,
+        String loginName,
+        String name,
         Long deptId,
         List<Long> visibleDeptIds,
         long issuedAt,

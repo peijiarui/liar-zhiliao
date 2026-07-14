@@ -1,10 +1,10 @@
-package org.liar.zhiliao.auth.oauth2.impl;
+package org.liar.zhiliao.auth.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.liar.zhiliao.auth.oauth2.OAuth2Authenticator;
-import org.liar.zhiliao.auth.oauth2.OAuth2Config;
-import org.liar.zhiliao.auth.oauth2.OAuth2UserInfo;
+import org.liar.zhiliao.auth.service.OAuth2Authenticator;
+import org.liar.zhiliao.auth.config.OAuth2Config;
+import org.liar.zhiliao.auth.record.OAuth2UserInfo;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;

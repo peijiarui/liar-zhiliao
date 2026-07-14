@@ -30,8 +30,11 @@ CREATE TABLE IF NOT EXISTS sys_department (
 
 CREATE TABLE IF NOT EXISTS sys_user (
     id              BIGSERIAL       PRIMARY KEY,
-    username        VARCHAR(50)     NOT NULL UNIQUE,
+    login_name      VARCHAR(50)     NOT NULL UNIQUE,
     password_hash   VARCHAR(255)    NOT NULL,
+    name            VARCHAR(100),
+    email           VARCHAR(200),
+    phone           VARCHAR(30),
     dept_id         BIGINT          NOT NULL DEFAULT 1,
     role            VARCHAR(20)     NOT NULL DEFAULT 'USER' CHECK (role IN ('USER', 'ADMIN')),
     tenant_id       VARCHAR(50)     NOT NULL DEFAULT 'default',

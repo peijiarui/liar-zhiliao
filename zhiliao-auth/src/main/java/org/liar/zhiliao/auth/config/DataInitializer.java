@@ -31,11 +31,11 @@ public class DataInitializer implements CommandLineRunner {
                 "lisi", "123456"
         );
 
-        testUsers.forEach((username, rawPassword) -> {
+        testUsers.forEach((loginName, rawPassword) -> {
             SysUser user = userMapper.selectOne(
-                    Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, username));
+                    Wrappers.<SysUser>lambdaQuery().eq(SysUser::getLoginName, loginName));
             if (user == null) {
-                log.warn("User {} not found in database, skipping password initialization", username);
+                log.warn("User {} not found in database, skipping password initialization", loginName);
                 return;
             }
             // 验证现有 hash 是否匹配，不匹配则更新
@@ -43,7 +43,7 @@ public class DataInitializer implements CommandLineRunner {
                 String newHash = passwordEncoder.encode(rawPassword);
                 user.setPasswordHash(newHash);
                 userMapper.updateById(user);
-                log.info("Updated password hash for user: {}", username);
+                log.info("Updated password hash for user: {}", loginName);
             }
         });
     }
