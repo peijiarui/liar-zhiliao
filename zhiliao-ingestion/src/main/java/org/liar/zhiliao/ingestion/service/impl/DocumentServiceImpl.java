@@ -1,12 +1,14 @@
 package org.liar.zhiliao.ingestion.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.liar.zhiliao.common.mapper.ZlKbDeptVisibilityMapper;
 import org.liar.zhiliao.ingestion.config.MinIOConfig;
 import org.liar.zhiliao.ingestion.config.RabbitMQConfig;
 import org.liar.zhiliao.ingestion.entity.ZlDocument;
@@ -21,6 +23,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
+import org.liar.zhiliao.common.model.CurrentUser;
+import org.liar.zhiliao.common.utils.UserContextHolder;
+import org.liar.zhiliao.common.entity.ZlKbDeptVisibility;
+
 /**
  * @author Pei
  * @since 2026-07-06
@@ -34,6 +40,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final MinioClient minioClient;
     private final MinIOConfig minIOConfig;
     private final ZlDocumentMapper documentMapper;
+    private final ZlKbDeptVisibilityMapper visibilityMapper;
     private final RabbitTemplate rabbitTemplate;
 
     public ZlDocument upload(MultipartFile file, Long kbId) {
@@ -44,6 +51,10 @@ public class DocumentServiceImpl implements DocumentService {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
+        // 从当前登录用户获取部门
+        CurrentUser currentUser = UserContextHolder.get();
+        Long deptId = currentUser != null ? currentUser.deptId() : 1L;
 
         // 2. Generate MinIO key
         String minioKey = "docs/" + kbId + "/" + UUID.randomUUID() + "/" + file.getOriginalFilename();
@@ -69,8 +80,22 @@ public class DocumentServiceImpl implements DocumentService {
                 .minioKey(minioKey)
                 .fileSize(file.getSize())
                 .md5(fileMd5)
+                .deptId(deptId)
                 .build();
         documentMapper.insert(doc);
+
+        // 确保知识库-部门可见性记录存在（供 BM25 检索过滤用）
+        ZlKbDeptVisibility existing = visibilityMapper.selectOne(
+                Wrappers.<ZlKbDeptVisibility>lambdaQuery()
+                        .eq(ZlKbDeptVisibility::getKbId, kbId)
+                        .eq(ZlKbDeptVisibility::getDeptId, deptId));
+        if (existing == null) {
+            ZlKbDeptVisibility visibility = ZlKbDeptVisibility.builder()
+                    .kbId(kbId)
+                    .deptId(deptId)
+                    .build();
+            visibilityMapper.insert(visibility);
+        }
 
         // 5. Send to RabbitMQ for async processing
         DocumentMessage message = DocumentMessage.builder()

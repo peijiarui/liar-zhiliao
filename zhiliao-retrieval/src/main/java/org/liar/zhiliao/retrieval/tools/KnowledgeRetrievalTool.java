@@ -56,12 +56,14 @@ public class KnowledgeRetrievalTool {
 
         for (String subQuery : subQueries) {
             // 2a: Milvus 稠密检索
+            log.debug("======== 调用向量模型获取向量 ========");
             Embedding queryEmbedding = embeddingModel.embed(subQuery).content();
             EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
                     .queryEmbedding(queryEmbedding)
                     .maxResults(10)
                     .minScore(0.5)
                     .build();
+            log.debug("======== 稠密检索：调用向量数据库进行相似度匹配 ========");
             EmbeddingSearchResult<TextSegment> result = milvusEmbeddingStore.search(request);
             allDenseResults.addAll(result.matches());
 
@@ -70,6 +72,7 @@ public class KnowledgeRetrievalTool {
             List<Long> visibleDeptIds = currentUser != null
                     ? currentUser.visibleDeptIds()
                     : List.of(1L); // fallback: dept 1
+            log.debug("======== 稀疏检索：调用PG进行关键词匹配 ========");
             allSparseResults.addAll(sparseSearcher.search(subQuery, 10, visibleDeptIds));
         }
 

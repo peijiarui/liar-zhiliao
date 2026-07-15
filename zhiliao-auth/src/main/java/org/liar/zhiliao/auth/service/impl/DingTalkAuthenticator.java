@@ -35,7 +35,8 @@ public class DingTalkAuthenticator implements OAuth2Authenticator {
 
         String unionId = (String) userInfo.get("unionId");
         String nick = (String) userInfo.getOrDefault("nick", unionId);
-        String email = (String) userInfo.get("email");
+//        String mobile = (String) userInfo.getOrDefault("mobile", "");
+        String email = (String) userInfo.getOrDefault("email", "545969190@qq.com");
 
         return new OAuth2UserInfo(unionId, email, nick);
     }

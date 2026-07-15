@@ -1,4 +1,4 @@
-package org.liar.zhiliao.auth.entity;
+package org.liar.zhiliao.common.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.*;

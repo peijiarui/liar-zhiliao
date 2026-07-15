@@ -18,7 +18,7 @@
             <artifactId>zhiliao-common</artifactId>
         </dependency>
 
-        <!-- langchain4j Easy RAG：提供文档加载、分割、内存向量存储等 -->
+        <!-- langchain4j Easy RAG：提供文档加载、分割、内存向量存储等 弃用！！！使用milvus -->
 <!--        <dependency>-->
 <!--            <groupId>dev.langchain4j</groupId>-->
 <!--            <artifactId>langchain4j-easy-rag</artifactId>-->
@@ -39,12 +39,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-
-        <!-- MyBatis-Plus -->
-        <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
 
         <!-- PostgreSQL -->
@@ -76,19 +70,6 @@
             <artifactId>minio</artifactId>
         </dependency>
 
-        <!-- Lombok -->
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- langchain4j-community-redis-spring-boot-starter弃用，采用milvus向量数据库 -->
-<!--        <dependency>-->
-<!--            <groupId>dev.langchain4j</groupId>-->
-<!--            <artifactId>langchain4j-community-redis-spring-boot-starter</artifactId>-->
-<!--            <version>${langchain4j.version}</version>-->
-<!--        </dependency>-->
     </dependencies>
 
 </project>

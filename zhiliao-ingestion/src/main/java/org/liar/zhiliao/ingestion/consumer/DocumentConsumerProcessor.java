@@ -47,6 +47,8 @@ public class DocumentConsumerProcessor {
             log.warn("Document not found: {}", documentId);
             return;
         }
+        Long deptId = doc.getDeptId();
+        if (deptId == null) deptId = 1L;
 
         // 1. Update status to PROCESSING
         doc.setStatus(DocumentStatusEnum.PROCESSING.getStatus());
@@ -73,6 +75,7 @@ public class DocumentConsumerProcessor {
             for (TextSegment parentSeg : splitResult.parentSegments()) {
                 ZlChunk parentChunk = ZlChunk.builder()
                         .docId(documentId)
+                        .deptId(deptId)
                         .content(parentSeg.text())
                         .chunkType("parent")
                         .metadata("{\"fileName\": \"" + message.getFileName() + "\"}")
@@ -90,6 +93,7 @@ public class DocumentConsumerProcessor {
                 TextSegment childSeg = splitResult.childSegments().get(i);
                 ZlChunk childChunk = ZlChunk.builder()
                         .docId(documentId)
+                        .deptId(deptId)
                         .content(childSeg.text())
                         .parentId(parentIds.get(mapping[i]))
                         .chunkType("child")

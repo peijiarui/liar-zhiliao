@@ -2,8 +2,8 @@ package org.liar.zhiliao.auth.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
-import org.liar.zhiliao.auth.entity.ZlKbDeptVisibility;
-import org.liar.zhiliao.auth.mapper.ZlKbDeptVisibilityMapper;
+import org.liar.zhiliao.common.entity.ZlKbDeptVisibility;
+import org.liar.zhiliao.common.mapper.ZlKbDeptVisibilityMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;

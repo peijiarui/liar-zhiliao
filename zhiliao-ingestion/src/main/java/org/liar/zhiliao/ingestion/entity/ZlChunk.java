@@ -16,6 +16,8 @@ public class ZlChunk {
 
     private Long docId;
 
+    private Long deptId;
+
     private String content;
 
     private String embeddingId;

@@ -35,6 +35,8 @@ public class ZlDocument {
 
     private String md5;
 
+    private Long deptId;
+
     private Integer chunkCount;
 
     private String tenantId;

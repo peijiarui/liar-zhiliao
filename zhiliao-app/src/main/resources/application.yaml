@@ -96,8 +96,8 @@ oauth2:
     client-secret: ${GITHUB_CLIENT_SECRET:6819718894767529b40e0da777f30e1ff5ffe471}
     redirect-uri: http://localhost:8080/oauth2/github/callback
   dingtalk:
-    client-id: ${DINGTALK_APP_ID:}
-    client-secret: ${DINGTALK_APP_SECRET:}
+    client-id: ${DINGTALK_APP_ID:dingh4zgqi7zjajy3f3e}
+    client-secret: ${DINGTALK_APP_SECRET:smiAHbtUG41JilkacNoOMT53jSmAgkpBUDmegD0-Zh_KoIquD4btzBVnYhCo4CmM}
     redirect-uri: http://localhost:8080/oauth2/dingtalk/callback
   wechat:
     # 预留，暂不启用

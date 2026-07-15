@@ -803,7 +803,7 @@ package org.liar.zhiliao.auth.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
-import org.liar.zhiliao.auth.entity.ZlKbDeptVisibility;
+import org.liar.zhiliao.common.entity.ZlKbDeptVisibility;
 
 /**
  * zl_kb_dept_visibility 表 Mapper。
@@ -820,8 +820,8 @@ package org.liar.zhiliao.auth.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
-import org.liar.zhiliao.auth.entity.ZlKbDeptVisibility;
-import org.liar.zhiliao.auth.mapper.ZlKbDeptVisibilityMapper;
+import org.liar.zhiliao.common.entity.ZlKbDeptVisibility;
+import org.liar.zhiliao.common.mapper.ZlKbDeptVisibilityMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
