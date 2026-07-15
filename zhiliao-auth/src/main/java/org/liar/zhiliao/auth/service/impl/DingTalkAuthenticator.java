@@ -7,13 +7,14 @@ import org.liar.zhiliao.auth.config.OAuth2Config;
 import org.liar.zhiliao.auth.record.OAuth2UserInfo;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
 
 /**
  * 钉钉扫码 OAuth2 认证器。
- * 使用钉钉 OAuth2 授权码流程：authCode → userAccessToken → 用户信息。
+ * 使用钉钉 OAuth2 授权码流程：authCode → userAccessToken → 用户信息 → 服务端 API 补全邮箱。
  */
 @Slf4j
 @Component
@@ -32,6 +33,7 @@ public class DingTalkAuthenticator implements OAuth2Authenticator {
     public OAuth2UserInfo authenticate(String code) {
         String accessToken = getUserAccessToken(code);
         Map<String, Object> userInfo = getUserInfo(accessToken);
+        log.info("DingTalk userInfo response: {}", userInfo);
 
         String unionId = (String) userInfo.get("unionId");
         String nick = (String) userInfo.getOrDefault("nick", unionId);

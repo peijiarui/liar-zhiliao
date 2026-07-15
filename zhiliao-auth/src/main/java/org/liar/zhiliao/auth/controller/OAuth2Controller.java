@@ -69,7 +69,7 @@ public class OAuth2Controller {
      * GET /oauth2/dingtalk/authorize — 返回带 state 的钉钉扫码 URL
      */
     @GetMapping("/dingtalk/authorize")
-    public ResponseEntity<Map<String, String>> dingtalkAuthorizeUrl() {
+    public void dingtalkAuthorize(HttpServletResponse response) throws IOException {
         OAuth2Config.ProviderConfig dingtalk = config.getDingtalk();
         String state = generateState();
         redis.opsForValue().set(stateKey(state), "dingtalk",
@@ -78,7 +78,7 @@ public class OAuth2Controller {
         String url = String.format(
                 "https://login.dingtalk.com/oauth2/auth?redirect_uri=%s&response_type=code&client_id=%s&scope=openid&prompt=consent&state=%s",
                 dingtalk.getRedirectUri(), dingtalk.getClientId(), state);
-        return ResponseEntity.ok(Map.of("authUrl", url));
+        response.sendRedirect(url);
     }
 
     /**
