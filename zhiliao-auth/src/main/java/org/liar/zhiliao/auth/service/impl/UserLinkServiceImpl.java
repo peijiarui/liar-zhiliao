@@ -11,6 +11,8 @@ import org.liar.zhiliao.auth.mapper.SysUserMapper;
 import org.liar.zhiliao.auth.record.OAuth2UserInfo;
 import org.liar.zhiliao.auth.service.UserLinkService;
 import org.springframework.stereotype.Service;
+import static org.liar.zhiliao.auth.enums.OAuth2ProviderEnum.DINGTALK;
+
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -35,10 +37,11 @@ public class UserLinkServiceImpl implements UserLinkService {
                 return user;
             }
             log.warn("OAuth link exists but user {} was deleted, will recreate", existingLink.getUserId());
+            oauthLinkMapper.deleteById(existingLink.getId());
         }
 
         // 2a. 钉钉：手机号自动关联
-        if ("dingtalk".equals(provider) && StringUtils.isNotBlank(userInfo.phone())) {
+        if (DINGTALK.getProvider().equals(provider) && StringUtils.isNotBlank(userInfo.phone())) {
             SysUser matched = userMapper.selectOne(
                     Wrappers.<SysUser>lambdaQuery().eq(SysUser::getPhone, userInfo.phone()));
             if (matched != null) {
@@ -56,7 +59,7 @@ public class UserLinkServiceImpl implements UserLinkService {
         String loginName = provider + "_" + userInfo.providerUserId();
         SysUser newUser = SysUser.builder()
                 .loginName(loginName)
-                .passwordHash("")
+                .passwordHash(null)
                 .name(userInfo.name())
                 .email(userInfo.email())
                 .phone(userInfo.phone())

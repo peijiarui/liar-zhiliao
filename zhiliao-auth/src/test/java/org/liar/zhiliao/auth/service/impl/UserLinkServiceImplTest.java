@@ -96,4 +96,24 @@ class UserLinkServiceImplTest {
         assertEquals("13900139000", result.getPhone());
         assertEquals("dingtalk_000", result.getLoginName());
     }
+
+    @Test
+    void shouldRecreateUserWhenOauthLinkPointsToDeletedUser() {
+        var userInfo = new OAuth2UserInfo("orphan", "o@b.com", null, null, "Orphan");
+        var existingLink = SysOauthLink.builder().id(99L).userId(999L).provider("github").providerUserId("orphan").build();
+        when(oauthLinkMapper.selectOne(any())).thenReturn(existingLink);
+        when(userMapper.selectById(999L)).thenReturn(null);
+        when(userMapper.insert(any(SysUser.class))).thenAnswer(i -> {
+            SysUser u = i.getArgument(0);
+            u.setId(100L);
+            return 1;
+        });
+
+        SysUser result = service.linkOrCreate(userInfo, "github");
+
+        assertEquals(100L, result.getId());
+        verify(oauthLinkMapper).deleteById(99L);
+        verify(userMapper).insert(any(SysUser.class));
+        verify(oauthLinkMapper, times(1)).insert(any(SysOauthLink.class));
+    }
 }
