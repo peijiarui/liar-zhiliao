@@ -10,7 +10,7 @@
 -- 1. Departments
 -- =============================================================================
 -- All sys_department are root-level (parent_id = NULL) for MVP.
--- The UNIQUE (tenant_id, name) constraint prevents duplicate inserts.
+-- The UNIQUE (tenant_id, loginName) constraint prevents duplicate inserts.
 
 INSERT INTO sys_department (name, parent_id, tenant_id)
 VALUES ('技术部', NULL, 'default'),

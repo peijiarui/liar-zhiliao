@@ -8,7 +8,7 @@ import java.util.List;
  * @param accessToken  短期 access token，15 min
  * @param refreshToken 长期 refresh token，7 day，每次刷新轮换
  * @param expiresIn    access token 剩余秒数
- * @param user         用户基本信息（id、loginName、name、deptId、visibleDeptIds）
+ * @param user         用户基本信息（id、loginName、loginName、deptId、visibleDeptIds）
  */
 public record TokenPair(
         String accessToken,

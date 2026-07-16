@@ -14,7 +14,6 @@ import org.liar.zhiliao.auth.service.TokenService;
 import org.liar.zhiliao.auth.service.UserLinkService;
 import org.liar.zhiliao.common.model.CurrentUser;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -24,7 +23,6 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
-import java.util.Map;
 
 /**
  * OAuth2 登录控制器。
