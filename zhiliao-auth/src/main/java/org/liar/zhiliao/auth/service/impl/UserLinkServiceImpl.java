@@ -30,7 +30,11 @@ public class UserLinkServiceImpl implements UserLinkService {
                         .eq(SysOauthLink::getProvider, provider)
                         .eq(SysOauthLink::getProviderUserId, userInfo.providerUserId()));
         if (existingLink != null) {
-            return userMapper.selectById(existingLink.getUserId());
+            SysUser user = userMapper.selectById(existingLink.getUserId());
+            if (user != null) {
+                return user;
+            }
+            log.warn("OAuth link exists but user {} was deleted, will recreate", existingLink.getUserId());
         }
 
         // 2a. 钉钉：手机号自动关联

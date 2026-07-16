@@ -1,7 +1,8 @@
-package org.liar.zhiliao.auth.service;
+package org.liar.zhiliao.auth.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
+import org.liar.zhiliao.auth.service.DeptPermissionService;
 import org.liar.zhiliao.common.entity.ZlKbDeptVisibility;
 import org.liar.zhiliao.common.mapper.ZlKbDeptVisibilityMapper;
 import org.springframework.stereotype.Service;
@@ -16,7 +17,7 @@ import java.util.Optional;
  */
 @Service
 @RequiredArgsConstructor
-public class DeptPermissionService {
+public class DeptPermissionServiceImpl implements DeptPermissionService {
 
     private final ZlKbDeptVisibilityMapper visibilityMapper;
 
@@ -26,6 +27,7 @@ public class DeptPermissionService {
      * @param deptId 部门 ID
      * @return 可见知识库 ID 列表，无权限时返回空列表
      */
+    @Override
     public List<Long> getVisibleKbIds(Long deptId) {
         List<ZlKbDeptVisibility> visibilities = visibilityMapper.selectList(
                 Wrappers.<ZlKbDeptVisibility>lambdaQuery()
@@ -45,6 +47,7 @@ public class DeptPermissionService {
      * @param deptId 部门 ID
      * @return 可见部门 ID 列表，至少包含自身
      */
+    @Override
     public List<Long> getVisibleDeptIds(Long deptId) {
         return Optional.ofNullable(deptId)
                 .map(List::of)

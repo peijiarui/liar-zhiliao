@@ -2,15 +2,19 @@ package org.liar.zhiliao.auth.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.liar.zhiliao.auth.service.OAuth2Authenticator;
+import org.apache.commons.lang3.StringUtils;
 import org.liar.zhiliao.auth.config.OAuth2Config;
 import org.liar.zhiliao.auth.record.OAuth2UserInfo;
+import org.liar.zhiliao.auth.record.resp.DingTalkTokenResp;
+import org.liar.zhiliao.auth.record.resp.DingTalkUserInfoResp;
+import org.liar.zhiliao.auth.service.OAuth2Authenticator;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
+
+import static org.liar.zhiliao.auth.enums.OAuth2ProviderEnum.DINGTALK;
 
 /**
  * 钉钉扫码 OAuth2 认证器。
@@ -26,21 +30,16 @@ public class DingTalkAuthenticator implements OAuth2Authenticator {
 
     @Override
     public String provider() {
-        return "dingtalk";
+        return DINGTALK.getProvider();
     }
 
     @Override
     public OAuth2UserInfo authenticate(String code) {
         String accessToken = getUserAccessToken(code);
-        Map<String, Object> userInfo = getUserInfo(accessToken);
-        log.info("DingTalk userInfo response: {}", userInfo);
+        DingTalkUserInfoResp userInfo = getUserInfo(accessToken);
+        log.info("DingTalk userInfo: {}", userInfo);
 
-        String unionId = (String) userInfo.get("unionId");
-        String nick = (String) userInfo.getOrDefault("nick", unionId);
-//        String mobile = (String) userInfo.getOrDefault("mobile", "");
-        String email = (String) userInfo.getOrDefault("email", "545969190@qq.com");
-
-        return new OAuth2UserInfo(unionId, email, nick);
+        return OAuth2UserInfo.of(userInfo);
     }
 
     private String getUserAccessToken(String code) {
@@ -56,23 +55,25 @@ public class DingTalkAuthenticator implements OAuth2Authenticator {
         );
 
         HttpEntity<Map<String, String>> request = new HttpEntity<>(body, headers);
-        ResponseEntity<Map> response = restTemplate.postForEntity(
-                "https://api.dingtalk.com/v1.0/oauth2/userAccessToken", request, Map.class);
+        ResponseEntity<DingTalkTokenResp> response = restTemplate.postForEntity(
+                DINGTALK.getAccessTokenUrl(), request, DingTalkTokenResp.class);
 
-        Map<String, Object> result = response.getBody();
-        if (result == null || !result.containsKey("accessToken")) {
-            throw new IllegalStateException("DingTalk access token request failed: " + result);
+        DingTalkTokenResp tokenResp = response.getBody();
+        if (tokenResp == null || StringUtils.isEmpty(tokenResp.accessToken())) {
+            throw new IllegalStateException("DingTalk access token request failed: " + response);
         }
-        return (String) result.get("accessToken");
+        return tokenResp.accessToken();
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> getUserInfo(String accessToken) {
+    private DingTalkUserInfoResp getUserInfo(String accessToken) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("x-acs-dingtalk-access-token", accessToken);
         HttpEntity<Void> request = new HttpEntity<>(headers);
-        ResponseEntity<Map> response = restTemplate.exchange(
-                "https://api.dingtalk.com/v1.0/contact/users/me", HttpMethod.GET, request, Map.class);
+        ResponseEntity<DingTalkUserInfoResp> response = restTemplate.exchange(
+                DINGTALK.getUserInfoUrl(), HttpMethod.GET, request, DingTalkUserInfoResp.class);
+        if (response.getBody() == null) {
+            throw new IllegalStateException("DingTalk user info request failed: " + response);
+        }
         return response.getBody();
     }
 }

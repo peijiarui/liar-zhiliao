@@ -2,9 +2,13 @@ package org.liar.zhiliao.auth.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.liar.zhiliao.auth.service.OAuth2Authenticator;
+import org.apache.commons.lang3.StringUtils;
 import org.liar.zhiliao.auth.config.OAuth2Config;
 import org.liar.zhiliao.auth.record.OAuth2UserInfo;
+import org.liar.zhiliao.auth.record.resp.GithubEmailResp;
+import org.liar.zhiliao.auth.record.resp.GithubTokenResp;
+import org.liar.zhiliao.auth.record.resp.GithubUserInfoResp;
+import org.liar.zhiliao.auth.service.OAuth2Authenticator;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
@@ -13,7 +17,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
-import java.util.Map;
+
+import static org.liar.zhiliao.auth.enums.OAuth2ProviderEnum.GITHUB;
 
 /**
  * GitHub OAuth2 认证器。
@@ -27,23 +32,32 @@ public class GitHubAuthenticator implements OAuth2Authenticator {
     private final OAuth2Config config;
     private final RestTemplate restTemplate;
 
+    /**
+     * GitHub 登录提供商名称。
+     */
     @Override
     public String provider() {
-        return "github";
+        return GITHUB.getProvider();
     }
 
+    /**
+     * 认证 GitHub 用户。
+     *
+     * @param code GitHub 授权码
+     * @return GitHub 用户信息
+     */
     @Override
     public OAuth2UserInfo authenticate(String code) {
         String accessToken = getAccessToken(code);
-        Map<String, Object> userInfo = getUserInfo(accessToken);
+        GithubUserInfoResp userInfo = getUserInfo(accessToken);
         String email = getPrimaryEmail(accessToken);
 
-        String providerUserId = String.valueOf(userInfo.get("id"));
-        String name = (String) userInfo.getOrDefault("login", providerUserId);
-
-        return new OAuth2UserInfo(providerUserId, email, name);
+        return OAuth2UserInfo.of(userInfo, email);
     }
 
+    /**
+     * 获取 GitHub access_token。
+     */
     private String getAccessToken(String code) {
         log.info("======开始获取github access_token======");
         OAuth2Config.ProviderConfig github = config.getGithub();
@@ -57,48 +71,64 @@ public class GitHubAuthenticator implements OAuth2Authenticator {
         body.add("redirect_uri", github.getRedirectUri());
 
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
-        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
-                "https://github.com/login/oauth/access_token",
-                HttpMethod.POST,
+        ResponseEntity<GithubTokenResp> response = restTemplate.postForEntity(
+                GITHUB.getAccessTokenUrl(),
                 request,
-                new ParameterizedTypeReference<>() {}
-        );
+                GithubTokenResp.class);
 
-        Map<String, Object> result = response.getBody();
-        if (result == null || !result.containsKey("access_token")) {
-            throw new IllegalStateException("GitHub access token request failed: " + result);
+        GithubTokenResp tokenResp = response.getBody();
+        if (tokenResp == null || StringUtils.isEmpty(tokenResp.accessToken())) {
+            throw new IllegalStateException("GitHub access token request failed: " + response);
         }
-        return (String) result.get("access_token");
+        return tokenResp.accessToken();
     }
 
-    private Map<String, Object> getUserInfo(String accessToken) {
+    /**
+     * 获取 GitHub 用户信息。
+     */
+    private GithubUserInfoResp getUserInfo(String accessToken) {
         log.info("======开始获取github用户信息======");
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
         HttpEntity<Void> request = new HttpEntity<>(headers);
         // 使用 ParameterizedTypeReference 明确指定返回的泛型类型
-        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
-                "https://api.github.com/user",
+        ResponseEntity<GithubUserInfoResp> response = restTemplate.exchange(
+                GITHUB.getUserInfoUrl(),
                 HttpMethod.GET,
                 request,
-                new ParameterizedTypeReference<>() {});
+                GithubUserInfoResp.class);
 
-        return response.getBody();
+        GithubUserInfoResp tokenResp = response.getBody();
+        if (tokenResp == null) {
+            throw new IllegalStateException("GitHub user info request failed: " + response);
+        }
+
+        return tokenResp;
     }
 
+    /**
+     * 获取 GitHub 用户邮箱。
+     * GitHub 默认不返回邮箱，需要单独请求。
+     */
     private String getPrimaryEmail(String accessToken) {
         try {
             log.info("======开始获取github用户邮箱信息======");
             HttpHeaders headers = new HttpHeaders();
             headers.setBearerAuth(accessToken);
             HttpEntity<Void> request = new HttpEntity<>(headers);
-            ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
-                    "https://api.github.com/user/emails", HttpMethod.GET, request, new ParameterizedTypeReference<>() {});
-            List<Map<String, Object>> emails = response.getBody();
+            ResponseEntity<List<GithubEmailResp>> response = restTemplate.exchange(
+                    "https://api.github.com/user/emails",
+                    HttpMethod.GET,
+                    request,
+                    new ParameterizedTypeReference<>() {
+                    });
+
+            List<GithubEmailResp> emails = response.getBody();
             if (emails != null) {
-                for (Map<String, Object> email : emails) {
-                    if (Boolean.TRUE.equals(email.get("primary"))) {
-                        return (String) email.get("email");
+                for (GithubEmailResp emailItem : emails) {
+                    // 直接通过访问器取值，无强转、无字符串key，编译期校验
+                    if (emailItem.primary()) {
+                        return emailItem.email();
                     }
                 }
             }
