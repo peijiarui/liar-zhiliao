@@ -3,7 +3,7 @@ package org.liar.zhiliao.chat.config;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.liar.zhiliao.chat.repository.CustomChatMemoryStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
  * @since 2026-07-05
  */
 @Configuration
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class ChatMemoryConfig {
 
     private final CustomChatMemoryStore customChatMemoryStore;
@@ -27,16 +27,11 @@ public class ChatMemoryConfig {
 
     @Bean
     public ChatMemoryProvider chatMemoryProvider() {
-        return new ChatMemoryProvider() {
-            @Override
-            public ChatMemory get(Object memoryId) {
-                return MessageWindowChatMemory.builder()
-                        .id(memoryId)
-                        .maxMessages(20)
-                        .chatMemoryStore(customChatMemoryStore)
-                        .build();
-            }
-        };
+        return memoryId -> MessageWindowChatMemory.builder()
+                .id(memoryId)
+                .maxMessages(20)
+                .chatMemoryStore(customChatMemoryStore)
+                .build();
     }
 
 }

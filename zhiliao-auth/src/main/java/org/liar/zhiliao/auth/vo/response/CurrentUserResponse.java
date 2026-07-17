@@ -1,9 +1,19 @@
-package org.liar.zhiliao.auth.record.resp;
+package org.liar.zhiliao.auth.vo.response;
 
 import org.liar.zhiliao.common.model.CurrentUser;
 
 import java.util.List;
 
+/**
+ * 当前登录用户信息
+ *
+ * @param id             用户 ID
+ * @param loginName      登录名
+ * @param name           姓名
+ * @param deptId         部门 ID
+ * @param visibleDeptIds 可见部门 ID 列表
+ * @param expiresAt      过期时间戳
+ */
 public record CurrentUserResponse(
         Long id,
         String loginName,

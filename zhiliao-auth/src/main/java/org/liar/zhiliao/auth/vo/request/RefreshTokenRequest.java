@@ -1,3 +1,3 @@
-package org.liar.zhiliao.auth.record.req;
+package org.liar.zhiliao.auth.vo.request;
 
 public record RefreshTokenRequest(String refreshToken) {}

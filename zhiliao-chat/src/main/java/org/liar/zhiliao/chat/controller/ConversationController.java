@@ -1,19 +1,17 @@
 package org.liar.zhiliao.chat.controller;
 
 import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ChatMessageType;
 import dev.langchain4j.data.message.UserMessage;
 import lombok.RequiredArgsConstructor;
 import org.liar.zhiliao.chat.entity.Conversation;
-import org.liar.zhiliao.chat.model.MessageResponse;
 import org.liar.zhiliao.chat.repository.CustomChatMemoryStore;
 import org.liar.zhiliao.chat.service.ConversationService;
-import org.springframework.http.ResponseEntity;
+import org.liar.zhiliao.chat.vo.response.MessageResponse;
+import org.liar.zhiliao.common.result.ResponseResult;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RequiredArgsConstructor
 @RestController
@@ -23,33 +21,61 @@ public class ConversationController {
     private final ConversationService conversationService;
     private final CustomChatMemoryStore chatMemoryStore;
 
+    /**
+     * 列出所有会话
+     *
+     * @return 会话列表
+     */
     @GetMapping
-    public ResponseEntity<List<Conversation>> list() {
-        return ResponseEntity.ok(conversationService.listConversations());
+    public List<Conversation> list() {
+        return conversationService.listConversations();
     }
 
+    /**
+     * 创建会话
+     *
+     * @return 会话记忆id
+     */
     @PostMapping
-    public ResponseEntity<Map<String, String>> create() {
+    public String create() {
         Conversation conversation = conversationService.createConversation();
-        return ResponseEntity.ok(Map.of("memoryId", conversation.getMemoryId()));
+        return conversation.getMemoryId();
     }
 
+    /**
+     * 删除会话
+     *
+     * @param memoryId 记忆id
+     * @return 响应结果
+     */
     @DeleteMapping("/{memoryId}")
-    public ResponseEntity<Void> delete(@PathVariable String memoryId) {
+    public ResponseResult<Void> delete(@PathVariable String memoryId) {
         conversationService.deleteConversation(memoryId);
-        return ResponseEntity.noContent().build();
+        return ResponseResult.ok();
     }
 
+    /**
+     * 更新会话标题
+     *
+     * @param memoryId 记忆id
+     * @param title    标题
+     * @return 响应结果
+     */
     @PutMapping("/{memoryId}/title")
-    public ResponseEntity<Void> updateTitle(@PathVariable String memoryId, @RequestBody Map<String, String> body) {
-        conversationService.updateTitle(memoryId, body.get("title"));
-        return ResponseEntity.ok().build();
+    public ResponseResult<Void> updateTitle(@PathVariable String memoryId, @RequestParam String title) {
+        conversationService.updateTitle(memoryId, title);
+        return ResponseResult.ok();
     }
 
+    /**
+     * 获取会话消息
+     *
+     * @param memoryId 记忆id
+     * @return 会话消息列表
+     */
     @GetMapping("/{memoryId}/messages")
-    public ResponseEntity<List<MessageResponse>> getMessages(@PathVariable String memoryId) {
-        List<ChatMessage> messages = chatMemoryStore.getMessages(memoryId);
-        List<MessageResponse> result = messages.stream()
+    public List<MessageResponse> getMessages(@PathVariable String memoryId) {
+        return chatMemoryStore.getMessages(memoryId).stream()
                 .filter(m -> m.type() == ChatMessageType.USER
                         || (m instanceof AiMessage ai && ai.text() != null && !ai.text().isBlank()))
                 .map(m -> {
@@ -60,9 +86,8 @@ public class ConversationController {
                     } else {
                         content = ((AiMessage) m).text();
                     }
-                    return new MessageResponse(role, content);
+                    return MessageResponse.of(role, content);
                 })
                 .toList();
-        return ResponseEntity.ok(result);
     }
 }

@@ -238,7 +238,7 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ChatMessageType;
 import lombok.RequiredArgsConstructor;
 import org.liar.zhiliao.chat.entity.Conversation;
-import org.liar.zhiliao.chat.model.MessageResponse;
+import org.liar.zhiliao.chat.vo.response.MessageResponse;
 import org.liar.zhiliao.chat.repository.CustomChatMemoryStore;
 import org.liar.zhiliao.chat.service.ConversationService;
 import org.springframework.http.ResponseEntity;

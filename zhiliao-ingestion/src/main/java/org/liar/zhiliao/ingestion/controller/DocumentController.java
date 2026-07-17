@@ -4,8 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.liar.zhiliao.ingestion.entity.ZlDocument;
 import org.liar.zhiliao.ingestion.service.DocumentService;
-import org.liar.zhiliao.ingestion.vo.response.DocumentRespVO;
-import org.springframework.http.ResponseEntity;
+import org.liar.zhiliao.ingestion.vo.response.DocumentResponse;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -20,54 +19,28 @@ public class DocumentController {
     private final DocumentService documentService;
 
     @GetMapping
-    public ResponseEntity<List<DocumentRespVO>> list(
+    public List<DocumentResponse> list(
             @RequestParam(value = "kbId", required = false) Long kbId,
             @RequestParam(value = "page", required = false) Integer page,
             @RequestParam(value = "pageSize", defaultValue = "20") Integer pageSize) {
-        List<ZlDocument> docs = documentService.listDocuments(kbId, page, pageSize);
-        List<DocumentRespVO> result = docs.stream()
-                .map(doc -> DocumentRespVO.builder()
-                        .id(doc.getId())
-                        .fileName(doc.getFileName())
-                        .fileType(doc.getFileType())
-                        .status(doc.getStatus())
-                        .fileSize(doc.getFileSize())
-                        .chunkCount(doc.getChunkCount())
-                        .createdAt(doc.getCreatedAt())
-                        .build())
+        return documentService.listDocuments(kbId, page, pageSize).stream()
+                .map(DocumentResponse::of)
                 .toList();
-        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<?> upload(
+    public DocumentResponse upload(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "kbId", defaultValue = "1") Long kbId) {
         ZlDocument doc = documentService.upload(file, kbId);
         log.info("Document uploaded: id={}, fileName={}, status={}",
                 doc.getId(), doc.getFileName(), doc.getStatus());
-        return ResponseEntity.ok(
-                DocumentRespVO.builder()
-                        .id(doc.getId())
-                        .fileName(doc.getFileName())
-                        .status(doc.getStatus())
-                        .fileSize(doc.getFileSize())
-                        .build());
+        return DocumentResponse.of(doc);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getDocument(@PathVariable Long id) {
+    public DocumentResponse getDocument(@PathVariable Long id) {
         ZlDocument doc = documentService.getDocument(id);
-        return ResponseEntity.ok(
-                DocumentRespVO.builder()
-                        .id(doc.getId())
-                        .fileName(doc.getFileName())
-                        .fileType(doc.getFileType())
-                        .status(doc.getStatus())
-                        .fileSize(doc.getFileSize())
-                        .chunkCount(doc.getChunkCount())
-                        .createdAt(doc.getCreatedAt())
-                        .build()
-        );
+        return DocumentResponse.of(doc);
     }
 }
