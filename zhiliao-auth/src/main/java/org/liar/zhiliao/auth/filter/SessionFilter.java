@@ -36,10 +36,11 @@ public class SessionFilter implements Filter {
         HttpServletResponse response = (HttpServletResponse) res;
         String path = request.getRequestURI();
 
-        // 跳过鉴权的路径：login、refresh、OAuth2 授权启动与回调
+        // 跳过鉴权的路径：login、refresh、OAuth2、Actuator 监控端点
         if (path.equals("/api/auth/login")
                 || path.equals("/api/auth/refresh")
-                || path.startsWith("/oauth2/")) {
+                || path.startsWith("/oauth2/")
+                || path.startsWith("/actuator/")) {
             chain.doFilter(req, res);
             return;
         }

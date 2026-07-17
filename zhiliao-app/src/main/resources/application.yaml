@@ -104,3 +104,26 @@ oauth2:
     app-id: ${WECHAT_APP_ID:}
     app-secret: ${WECHAT_APP_SECRET:}
     redirect-uri: http://localhost:8080/oauth2/wechat/callback
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  metrics:
+    tags:
+      application: zhiliao
+    export:
+      prometheus:
+        enabled: true
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+
+log:
+  aspect:
+    enabled: true
+#    log-ip: true # 开启的话会从请求头获取请求的ip
+    expression: execution(* org.liar.zhiliao.*.controller..*.*(..)) && !within(org.liar.zhiliao.chat.controller.ChatController)

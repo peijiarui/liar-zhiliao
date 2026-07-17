@@ -41,3 +41,6 @@ data/
 ### Superpowers ###
 .superpowers/
 /docs/html/build-standalone.sh
+
+### 日志
+logs/

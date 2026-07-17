@@ -255,6 +255,97 @@ services:
       start_period: 120s
 
   # ---------------------------------------------------------------------------
+  # Prometheus - Metrics Collection & Alerting
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: zhiliao-prometheus
+    restart: unless-stopped
+    networks:
+      - zhiliao-net
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # ---------------------------------------------------------------------------
+  # Grafana - Metrics & Logs Visualization
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: zhiliao-grafana
+    restart: unless-stopped
+    networks:
+      - zhiliao-net
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 192M
+
+  # ---------------------------------------------------------------------------
+  # Loki - Log Aggregation
+  # ---------------------------------------------------------------------------
+  loki:
+    image: grafana/loki:latest
+    container_name: zhiliao-loki
+    restart: unless-stopped
+    networks:
+      - zhiliao-net
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml
+      - loki-data:/tmp/loki
+    command: -config.file=/etc/loki/loki-config.yml
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # ---------------------------------------------------------------------------
+  # Promtail - Log Shipper (scrapes app logs, ships to Loki)
+  # ---------------------------------------------------------------------------
+  promtail:
+    image: grafana/promtail:latest
+    container_name: zhiliao-promtail
+    restart: unless-stopped
+    networks:
+      - zhiliao-net
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml
+      - ../logs:/var/log/zhiliao
+    command: -config.file=/etc/promtail/promtail-config.yml
+    depends_on:
+      - loki
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+
+  # ---------------------------------------------------------------------------
   # Elasticsearch - Keyword Search (Commented Out)
   # ---------------------------------------------------------------------------
   # Uncomment this block and add `elasticsearch` to any service's `depends_on`
