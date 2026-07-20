@@ -53,10 +53,10 @@ public class TokenServiceImpl implements TokenService {
         long refreshExpiresAt = now + props.getRefreshTokenTtlSeconds() * 1000L;
 
         SessionData session = new SessionData(
-                accessTokenId, user.id(), user.loginName(), user.name(), user.deptId(),
+                accessTokenId, user.id(), user.loginName(), user.name(), user.role(), user.deptId(),
                 user.visibleDeptIds(), refreshTokenId, now, accessExpiresAt);
         RefreshTokenData refresh = new RefreshTokenData(
-                refreshTokenId, user.id(), user.loginName(), user.name(), user.deptId(),
+                refreshTokenId, user.id(), user.loginName(), user.name(), user.role(), user.deptId(),
                 user.visibleDeptIds(), now, refreshExpiresAt, false);
 
         store(sessionKey(accessToken), session, props.getAccessTokenTtlSeconds());
@@ -65,7 +65,7 @@ public class TokenServiceImpl implements TokenService {
         return new TokenPair(
                 accessToken, refreshToken,
                 props.getAccessTokenTtlSeconds(),
-                new TokenPair.UserInfo(user.id(), user.loginName(), user.name(), user.deptId(), user.visibleDeptIds()));
+                new TokenPair.UserInfo(user.id(), user.loginName(), user.name(), user.role(), user.deptId(), user.visibleDeptIds()));
     }
 
     /** 查询 access token 对应会话，无效返回 null */
@@ -110,11 +110,11 @@ public class TokenServiceImpl implements TokenService {
 
         // 标记旧 refresh token 为已轮换（防重放）
         RefreshTokenData rotated = new RefreshTokenData(
-                old.tokenId(), old.userId(), old.loginName(), old.name(), old.deptId(),
+                old.tokenId(), old.userId(), old.loginName(), old.name(), old.role(), old.deptId(),
                 old.visibleDeptIds(), old.issuedAt(), old.expiresAt(), true);
         store(refreshKey(refreshToken), rotated, props.getRefreshTokenTtlSeconds());
 
-        CurrentUser user = new CurrentUser(old.userId(), old.loginName(), old.name(), old.deptId(), old.visibleDeptIds());
+        CurrentUser user = new CurrentUser(old.userId(), old.loginName(), old.name(), old.role(), old.deptId(), old.visibleDeptIds());
         return issueToken(user);
     }
 

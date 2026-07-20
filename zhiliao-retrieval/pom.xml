@@ -38,6 +38,12 @@
             <artifactId>langchain4j-milvus-spring-boot-starter</artifactId>
         </dependency>
 
+        <!-- Micrometer 指标采集 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
+
     </dependencies>
 
 </project>

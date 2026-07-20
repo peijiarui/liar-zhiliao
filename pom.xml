@@ -31,6 +31,8 @@
         <langchain4j.version>1.17.0-beta27</langchain4j.version>
         <skipTests>true</skipTests>
         <mybatis-plus.version>3.5.9</mybatis-plus.version>
+        <sentinel.version>1.8.8</sentinel.version>
+        <spring.cloud.alibaba.version>2025.0.0.0</spring.cloud.alibaba.version>
     </properties>
 
     <dependencyManagement>
@@ -65,6 +67,15 @@
                 <groupId>org.liar.ai</groupId>
                 <artifactId>zhiliao-admin</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+
+            <!-- Spring Cloud Alibaba BOM (含 Sentinel 版本管理) -->
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${spring.cloud.alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
             <!-- Lombok -->
@@ -134,6 +145,13 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
                 <version>3.20.0</version>
+            </dependency>
+
+            <!-- Spring Cloud Alibaba Sentinel -->
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-starter-alibaba-sentinel</artifactId>
+                <version>${spring.cloud.alibaba.version}</version>
             </dependency>
 
             <!-- ========以下指定依赖版本，解决漏洞，这样pom中就不会有报警告的依赖了======== -->

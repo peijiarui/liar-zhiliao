@@ -12,8 +12,9 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * 启动时初始化测试用户密码，确保 BCrypt hash 始终与明文密码一致。
- * 避免 data.sql 中硬编码 hash 不匹配的问题。
+ * 启动时初始化用户。
+ * 自动创建默认管理员（admin / admin123），确保首次部署有入口。
+ * 同时更新已有用户的密码 hash（配合 BCrypt 编码）。
  */
 @Slf4j
 //@Component
@@ -25,26 +26,32 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        Map<String, String> testUsers = Map.of(
-                "admin", "admin123",
-                "zhangsan", "123456",
-                "lisi", "123456"
-        );
+        initUser("admin", "admin123", "管理员", "ADMIN");
+        initUser("zhangsan", "123456", "张三", "USER");
+        initUser("lisi", "123456", "李四", "USER");
+    }
 
-        testUsers.forEach((loginName, rawPassword) -> {
-            SysUser user = userMapper.selectOne(
-                    Wrappers.<SysUser>lambdaQuery().eq(SysUser::getLoginName, loginName));
-            if (user == null) {
-                log.warn("User {} not found in database, skipping password initialization", loginName);
-                return;
-            }
-            // 验证现有 hash 是否匹配，不匹配则更新
+    private void initUser(String loginName, String rawPassword, String name, String role) {
+        SysUser user = userMapper.selectOne(
+                Wrappers.<SysUser>lambdaQuery().eq(SysUser::getLoginName, loginName));
+        if (user == null) {
+            // 创建用户
+            user = SysUser.builder()
+                    .loginName(loginName)
+                    .passwordHash(passwordEncoder.encode(rawPassword))
+                    .name(name)
+                    .role(role)
+                    .deptId(1L)
+                    .build();
+            userMapper.insert(user);
+            log.info("Created user: loginName={}, role={}", loginName, role);
+        } else {
+            // 更新密码 hash
             if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
-                String newHash = passwordEncoder.encode(rawPassword);
-                user.setPasswordHash(newHash);
+                user.setPasswordHash(passwordEncoder.encode(rawPassword));
                 userMapper.updateById(user);
                 log.info("Updated password hash for user: {}", loginName);
             }
-        });
+        }
     }
 }

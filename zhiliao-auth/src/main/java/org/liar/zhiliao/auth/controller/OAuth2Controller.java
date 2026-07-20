@@ -106,7 +106,7 @@ public class OAuth2Controller {
 
         List<Long> visibleDeptIds = deptPermissionService.getVisibleDeptIds(user.getDeptId());
         CurrentUser currentUser = CurrentUser.of(
-                user.getId(), user.getLoginName(), user.getName(), user.getDeptId(), visibleDeptIds);
+                user.getId(), user.getLoginName(), user.getName(), user.getRole(), user.getDeptId(), visibleDeptIds);
         TokenPair pair = tokenService.issueToken(currentUser);
 
         log.info("OAuth login success: provider={}, userId={}, loginName={}",

@@ -80,7 +80,7 @@ services:
       - "8001:8001"           # RedisInsight web UI (optional, local dev only)
     environment:
       # No password set for local development
-      REDIS_ARGS: "--save 60 1000 --appendonly yes"
+      REDIS_ARGS: "--save 60 1000 --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -344,6 +344,28 @@ services:
         limits:
           cpus: '0.1'
           memory: 64M
+
+  # ---------------------------------------------------------------------------
+  # Sentinel Dashboard - 限流熔断控制台（可选）
+  # 当前应用未引入 sentinel-transport-simple-http 依赖，Dashboard 启动后
+  # 不会收到应用心跳和应用数据显示。如需启用，在 zhiliao-app/pom.xml 添加：
+  #   com.alibaba.csp:sentinel-transport-simple-http:${sentinel.version}
+  # ---------------------------------------------------------------------------
+  sentinel-dashboard:
+    image: bladex/sentinel-dashboard:1.8.8
+    container_name: zhiliao-sentinel
+    restart: unless-stopped
+    networks:
+      - zhiliao-net
+    ports:
+      - "8858:8858"
+    environment:
+      JAVA_OPTS: "-Dserver.port=8858"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
 
   # ---------------------------------------------------------------------------
   # Elasticsearch - Keyword Search (Commented Out)

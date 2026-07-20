@@ -11,6 +11,7 @@ public record SessionData(
         Long userId,
         String loginName,
         String name,
+        String role,
         Long deptId,
         List<Long> visibleDeptIds,
         String refreshTokenId,

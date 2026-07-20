@@ -22,9 +22,10 @@ public record TokenPair(
      * @param id             用户 ID
      * @param loginName      登录名
      * @param name           用户名
+     * @param role           角色：USER / ADMIN
      * @param deptId         部门 ID
      * @param visibleDeptIds 可见部门 ID 列表
      */
-    public record UserInfo(Long id, String loginName, String name, Long deptId, List<Long> visibleDeptIds) {
+    public record UserInfo(Long id, String loginName, String name, String role, Long deptId, List<Long> visibleDeptIds) {
     }
 }

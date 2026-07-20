@@ -18,9 +18,12 @@ import org.liar.zhiliao.retrieval.repository.ChunkRepository;
 import org.liar.zhiliao.retrieval.records.RankedChunk;
 import org.liar.zhiliao.retrieval.service.Reranker;
 import org.liar.zhiliao.retrieval.records.SparseSearchResult;
+import org.liar.zhiliao.retrieval.service.RetrievalCacheService;
+import org.liar.zhiliao.retrieval.service.RetrievalMetrics;
 import org.liar.zhiliao.retrieval.service.SparseSearcher;
 import org.springframework.stereotype.Component;
 
+import io.micrometer.core.instrument.Timer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -40,22 +43,36 @@ public class KnowledgeRetrievalTool {
     private final Reranker reranker;
     private final ChunkRepository chunkRepository;
     private final ChatModel chatModel;
+    private final RetrievalCacheService retrievalCacheService;
+    private final RetrievalMetrics retrievalMetrics;
 
     @Tool("检索企业知识库：查找公司制度、政策、流程、产品信息等企业内部知识。仅当用户明确询问企业内部知识时调用，日常闲聊无需调用")
     public String retrieveKnowledge(@P("查询内容") String query) {
-        // Step 1: 查询改写
-        List<String> subQueries = rewriteQuery(query);
+        // Step 1: 查询改写（计时）
+        List<String> subQueries;
+        Timer.Sample rewriteSample = retrievalMetrics.startTimer();
+        try {
+            subQueries = rewriteQuery(query);
+        } finally {
+            rewriteSample.stop(retrievalMetrics.getRewrite());
+        }
         if (subQueries.isEmpty()) {
             subQueries = List.of(query);
         }
         log.debug("Rewritten queries: {}", subQueries);
 
-        // Step 2: 对每个子查询执行双路检索
+        // Step 2: 尝试 Level 2 缓存（检索结果缓存）
+        List<RankedChunk> ranked = tryCache(query, subQueries);
+        if (ranked != null) {
+            return ranked.isEmpty() ? "" : buildContextFromRanked(ranked);
+        }
+
+        // Step 3: 对每个子查询执行双路检索
         List<EmbeddingMatch<TextSegment>> allDenseResults = new ArrayList<>();
         List<SparseSearchResult> allSparseResults = new ArrayList<>();
 
         for (String subQuery : subQueries) {
-            // 2a: Milvus 稠密检索
+            // 3a: Milvus 稠密检索（计时）
             log.debug("======== 调用向量模型获取向量 ========");
             Embedding queryEmbedding = embeddingModel.embed(subQuery).content();
             EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
@@ -64,26 +81,75 @@ public class KnowledgeRetrievalTool {
                     .minScore(0.5)
                     .build();
             log.debug("======== 稠密检索：调用向量数据库进行相似度匹配 ========");
-            EmbeddingSearchResult<TextSegment> result = milvusEmbeddingStore.search(request);
-            allDenseResults.addAll(result.matches());
+            Timer.Sample denseSample = retrievalMetrics.startTimer();
+            try {
+                EmbeddingSearchResult<TextSegment> result = milvusEmbeddingStore.search(request);
+                allDenseResults.addAll(result.matches());
+            } finally {
+                denseSample.stop(retrievalMetrics.getDenseSearch());
+            }
 
-            // 2b: PG BM25 稀疏检索
+            // 3b: PG BM25 稀疏检索（计时）
             CurrentUser currentUser = UserContextHolder.get();
             List<Long> visibleDeptIds = currentUser != null
                     ? currentUser.visibleDeptIds()
-                    : List.of(1L); // fallback: dept 1
+                    : List.of(1L);
             log.debug("======== 稀疏检索：调用PG进行关键词匹配 ========");
-            allSparseResults.addAll(sparseSearcher.search(subQuery, 10, visibleDeptIds));
+            Timer.Sample sparseSample = retrievalMetrics.startTimer();
+            try {
+                allSparseResults.addAll(sparseSearcher.search(subQuery, 10, visibleDeptIds));
+            } finally {
+                sparseSample.stop(retrievalMetrics.getSparseSearch());
+            }
         }
 
-        // Step 3: RRF 融合排序
-        List<RankedChunk> ranked = reranker.rerank(query, allDenseResults, allSparseResults, 10);
+        // Step 4: RRF 融合排序
+        ranked = reranker.rerank(query, allDenseResults, allSparseResults, 10);
+        retrievalMetrics.recordRrfResultCount(ranked.size());
 
+        // Step 5: 空结果计数 + 写入 Level 2 缓存
         if (ranked.isEmpty()) {
+            retrievalMetrics.getEmptyResult().increment();
             return "";
         }
+        putCache(query, subQueries, ranked);
 
-        // Step 4: 父子文档替换（child → parent content）
+        // Step 6: 父子文档替换 + 构建上下文
+        return buildContextFromRanked(ranked);
+    }
+
+    /**
+     * 尝试从 Level 2 缓存读取检索结果。
+     * 仅对未改写（单子查询 = 原始 query）的情况生效。
+     *
+     * @return 缓存的 RankedChunk 列表，未命中返回 null
+     */
+    private List<RankedChunk> tryCache(String query, List<String> subQueries) {
+        if (subQueries.size() == 1 && subQueries.get(0).equals(query)) {
+            List<RankedChunk> cached = retrievalCacheService.getCachedRetrieval(query);
+            if (cached != null) {
+                log.debug("Level 2 cache hit for query: {}", query);
+                return cached;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 写入 Level 2 缓存。仅对未改写的单子查询缓存，
+     * 避免组合子查询场景导致缓存膨胀。
+     */
+    private void putCache(String query, List<String> subQueries, List<RankedChunk> ranked) {
+        if (subQueries.size() == 1 && subQueries.get(0).equals(query)) {
+            retrievalCacheService.putRetrieval(query, ranked);
+        }
+    }
+
+    /**
+     * 从 RankedChunk 列表构建 LLM 上下文。
+     * 优先 parent content，parent 不存在时退回到 child content。
+     */
+    private String buildContextFromRanked(List<RankedChunk> ranked) {
         StringBuilder context = new StringBuilder();
         for (RankedChunk chunk : ranked) {
             String content;
@@ -102,7 +168,6 @@ public class KnowledgeRetrievalTool {
             }
             context.append(content);
         }
-
         return context.toString();
     }
 

@@ -15,6 +15,7 @@ import org.liar.zhiliao.common.exception.AuthException;
 import org.liar.zhiliao.common.model.CurrentUser;
 import org.liar.zhiliao.common.result.ResponseResult;
 import org.liar.zhiliao.common.utils.UserContextHolder;
+import org.liar.zhiliao.auth.service.DeptPermissionService;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -29,13 +30,15 @@ public class AuthController {
 
     private final UserService userService;
     private final TokenService tokenService;
+    private final DeptPermissionService deptPermissionService;
 
     @PostMapping("/login")
     public TokenPair login(@RequestBody LoginRequest request) {
         try {
             SysUser user = userService.authenticate(request.loginName(), request.password());
             CurrentUser currentUser = new CurrentUser(
-                    user.getId(), user.getLoginName(), user.getName(), user.getDeptId());
+                    user.getId(), user.getLoginName(), user.getName(), user.getRole(),
+                    user.getDeptId(), deptPermissionService.getVisibleDeptIds(user.getDeptId()));
             TokenPair pair = tokenService.issueToken(currentUser);
 
             log.info("登录成功: userId={}, loginName={}", user.getId(), user.getLoginName());

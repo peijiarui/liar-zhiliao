@@ -60,7 +60,7 @@ public class SessionFilter implements Filter {
         try {
             CurrentUser user = new CurrentUser(
                     session.userId(), session.loginName(), session.name(),
-                    session.deptId(), session.visibleDeptIds());
+                    session.role(), session.deptId(), session.visibleDeptIds());
             UserContextHolder.set(user);
             chain.doFilter(req, res);
         } finally {

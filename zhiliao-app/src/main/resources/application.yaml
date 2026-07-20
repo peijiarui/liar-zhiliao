@@ -11,6 +11,21 @@ spring:
       host: ${RESOURCE_SERVER_HOST}
       port: 6379
       password: ${RESOURCE_SERVER_PASSWORD}
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+  cloud:
+    sentinel:
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD_HOST:localhost}:8858
+        # 应用心跳端口，dashboard 通过此端口拉取应用数据
+        port: 8719
+        # Docker 环境下 dashboard 需通过 host.docker.internal 回连应用
+        client-ip: ${SENTINEL_CLIENT_IP:}
+      eager: true
   datasource:
     url: jdbc:postgresql://${RESOURCE_SERVER_HOST}:5432/zhiliao?useUnicode=true&characterEncoding=utf8
     username: peijiarui
