@@ -11,7 +11,6 @@ import org.liar.zhiliao.chat.security.InputFilter;
 import org.liar.zhiliao.chat.service.ChatService;
 import org.liar.zhiliao.chat.service.ConversationService;
 import org.liar.zhiliao.chat.service.TitleGenerationService;
-import org.liar.zhiliao.retrieval.service.RetrievalCacheService;
 import org.liar.zhiliao.retrieval.tools.KnowledgeRetrievalTool;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,7 +34,6 @@ public class ChatController {
     private final TitleGenerationService titleGenerationService;
     private final InputFilter inputFilter;
     private final KnowledgeRetrievalTool knowledgeRetrievalTool;
-    private final RetrievalCacheService retrievalCacheService;
 
     @GetMapping(produces = "text/html;charset=utf-8")
     @SentinelResource(
@@ -56,8 +54,10 @@ public class ChatController {
         }
 
         final String finalMessage = message;
+
         conversationService.touchConversation(memoryId);
 
+        // 正常 LLM 流式回答
         return assistant.chat(memoryId, finalMessage)
                 .doOnComplete(() -> {
                     if (conversationService.tryUpdateTitleIfDefault(memoryId, "生成中...")) {
@@ -84,7 +84,7 @@ public class ChatController {
 
     /**
      * 熔断降级：LLM API 异常时触发。
-     * 兜底策略：查缓存 → 返回知识库文档片段。
+     * 兜底策略：返回知识库文档片段。
      */
     public Flux<String> chatFallback(String memoryId, String message, Throwable t) {
         log.warn("Circuit broken or exception: memoryId={}, message={}, error={}",
@@ -100,23 +100,10 @@ public class ChatController {
     }
 
     /**
-     * 熔断降级核心逻辑：先查 Level 1 缓存再检索文档。
-     * L1 缓存命中时直接返回缓存答案（零 LLM 调用）；
-     * 未命中时检索知识库返回文档片段。
+     * 熔断降级核心逻辑：从知识库检索文档片段返回。
      */
     private Flux<String> fallbackToDocs(String message) {
-        // 先查 Level 1 热点问答缓存
-        try {
-            String cached = retrievalCacheService.getCachedAnswer(message);
-            if (cached != null) {
-                log.debug("Level 1 cache hit in fallback for query: {}", truncate(message, 50));
-                return Flux.just(cached);
-            }
-        } catch (Exception e) {
-            log.warn("Level 1 cache lookup failed: {}", e.getMessage());
-        }
-
-        // 再查知识库文档片段
+        // 直接从知识库检索文档片段
         try {
             String docs = knowledgeRetrievalTool.retrieveKnowledge(message);
             if (docs != null && !docs.isEmpty()) {
