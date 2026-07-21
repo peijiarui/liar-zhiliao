@@ -88,7 +88,6 @@ COMMENT ON COLUMN sys_role_permission.permission_id IS '关联 sys_permission.id
 sentinel-dashboard:
   image: bladex/sentinel-dashboard:latest
   container_name: zhiliao-sentinel
-  restart: unless-stopped
   networks:
     - zhiliao-net
   ports:
@@ -114,7 +113,7 @@ sentinel-dashboard:
 <dependency>
     <groupId>com.alibaba.cloud</groupId>
     <artifactId>spring-cloud-starter-alibaba-sentinel</artifactId>
-    <version>2023.0.3.2</version>
+    <version>2025.0.0.0</version>
 </dependency>
 <!-- Sentinel AOP 注解支持 -->
 <dependency>

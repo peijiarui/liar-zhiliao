@@ -1,7 +1,7 @@
 package org.liar.zhiliao.config;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.cache.Cache;
-import org.springframework.cache.support.SimpleValueWrapper;
 
 import java.util.concurrent.Callable;
 
@@ -25,17 +25,17 @@ public class TwoTierCache implements Cache {
     }
 
     @Override
-    public String getName() {
+    public @NonNull String getName() {
         return name;
     }
 
     @Override
-    public Object getNativeCache() {
+    public @NonNull Object getNativeCache() {
         return this;
     }
 
     @Override
-    public ValueWrapper get(Object key) {
+    public ValueWrapper get(@NonNull Object key) {
         // L1 快速命中
         ValueWrapper wrapper = l1.get(key);
         if (wrapper != null) {
@@ -49,9 +49,12 @@ public class TwoTierCache implements Cache {
         return wrapper;
     }
 
+    /**
+     * 获取缓存项。
+     * <p>如果缓存项不存在，则从 L2 获取并缓存。</p>
+     */
     @Override
-    @SuppressWarnings("unchecked")
-    public <T> T get(Object key, Class<T> type) {
+    public <T> T get(@NonNull Object key, Class<T> type) {
         T value = l1.get(key, type);
         if (value != null) {
             return value;
@@ -63,9 +66,13 @@ public class TwoTierCache implements Cache {
         return value;
     }
 
+    /**
+     * 获取缓存项。
+     * <p>如果缓存项不存在，则调用 valueLoader 获取并缓存。</p>
+     */
     @Override
     @SuppressWarnings("unchecked")
-    public <T> T get(Object key, Callable<T> valueLoader) {
+    public <T> T get(@NonNull Object key, @NonNull Callable<T> valueLoader) {
         ValueWrapper wrapper = l1.get(key);
         if (wrapper != null) {
             return (T) wrapper.get();
@@ -78,18 +85,27 @@ public class TwoTierCache implements Cache {
         return value;
     }
 
+    /**
+     * 写缓存项。
+     */
     @Override
-    public void put(Object key, Object value) {
+    public void put(@NonNull Object key, Object value) {
         l1.put(key, value);
         l2.put(key, value);
     }
 
+    /**
+     * 删除缓存项。
+     */
     @Override
-    public void evict(Object key) {
+    public void evict(@NonNull Object key) {
         l1.evict(key);
         l2.evict(key);
     }
 
+    /**
+     * 清空缓存。
+     */
     @Override
     public void clear() {
         l1.clear();

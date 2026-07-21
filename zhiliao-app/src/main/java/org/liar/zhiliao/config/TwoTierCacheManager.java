@@ -1,5 +1,6 @@
 package org.liar.zhiliao.config;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 
@@ -23,7 +24,7 @@ public class TwoTierCacheManager implements CacheManager {
     }
 
     @Override
-    public Cache getCache(String name) {
+    public Cache getCache(@NonNull String name) {
         return caches.computeIfAbsent(name, n -> {
             Cache caffeine = l1.getCache(n);
             Cache redis = l2.getCache(n);
@@ -35,7 +36,7 @@ public class TwoTierCacheManager implements CacheManager {
     }
 
     @Override
-    public Collection<String> getCacheNames() {
+    public @NonNull Collection<String> getCacheNames() {
         return l1.getCacheNames();
     }
 }
