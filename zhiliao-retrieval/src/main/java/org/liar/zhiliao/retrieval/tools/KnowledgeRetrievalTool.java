@@ -76,11 +76,11 @@ public class KnowledgeRetrievalTool {
             log.debug("Rewrite cache hit for '{}': {}", canonicalKey, rewritten);
         } else if (!normalized.equals(query)) {
             // normalize 后有变化，说明需要 LLM 改写
-            Timer.Sample rewriteSample = retrievalMetrics.startTimer();
+            Timer.Sample rewriteSample = retrievalMetrics.startTimer(); // 「查询重写」埋点开始，必须调用start
             try {
                 subQueries = rewriteQuery(query);
             } finally {
-                rewriteSample.stop(retrievalMetrics.getRewrite());
+                rewriteSample.stop(retrievalMetrics.getRewrite()); // 「查询重写」埋点结束，必须调用stop
             }
             if (subQueries.isEmpty()) {
                 subQueries = List.of(canonicalKey);

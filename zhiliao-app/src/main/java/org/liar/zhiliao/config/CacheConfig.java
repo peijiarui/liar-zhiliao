@@ -42,8 +42,8 @@ public class CacheConfig {
     public CacheManager caffeineCacheManager() {
         CaffeineCacheManager manager = new CaffeineCacheManager("query_rewrite", "retrieval_result");
         manager.setCaffeine(Caffeine.newBuilder()
-                // 缓存上限2000条（rewrite + retrieval 共享），防止内存泄漏
-                .maximumSize(2000)
+                // 缓存上限1000条（rewrite + retrieval 共享），防止内存泄漏
+                .maximumSize(1000)
                 // 缓存10min
                 .expireAfterWrite(10, TimeUnit.MINUTES)
                 .recordStats());
