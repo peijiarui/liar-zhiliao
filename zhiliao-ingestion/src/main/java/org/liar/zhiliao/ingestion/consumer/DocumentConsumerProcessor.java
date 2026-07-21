@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.liar.zhiliao.ingestion.config.MinIOConfig;
 import org.liar.zhiliao.ingestion.entity.ZlChunk;
 import org.liar.zhiliao.ingestion.entity.ZlDocument;
+import org.liar.zhiliao.common.event.DocumentUpdateEvent;
 import org.liar.zhiliao.ingestion.enums.DocumentStatusEnum;
 import org.liar.zhiliao.ingestion.mapper.ZlChunkMapper;
 import org.liar.zhiliao.ingestion.mapper.ZlDocumentMapper;
@@ -19,10 +20,12 @@ import org.liar.zhiliao.ingestion.model.DocumentMessage;
 import org.liar.zhiliao.ingestion.records.ParentChildSplitResult;
 import org.liar.zhiliao.ingestion.service.DocumentParser;
 import org.liar.zhiliao.ingestion.service.RecursiveDocumentSplitter;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -37,6 +40,7 @@ public class DocumentConsumerProcessor {
     private final ZlChunkMapper chunkMapper;
     private final EmbeddingModel embeddingModel;
     private final EmbeddingStore<TextSegment> milvusEmbeddingStore;
+    private final ApplicationEventPublisher eventPublisher;
 
     public void process(DocumentMessage message) {
         Long documentId = message.getDocumentId();
@@ -128,6 +132,9 @@ public class DocumentConsumerProcessor {
             doc.setStatus(DocumentStatusEnum.COMPLETED.getStatus());
             doc.setChunkCount(splitResult.parentSegments().size());
             documentMapper.updateById(doc);
+
+            // 发布文档更新事件，触发检索缓存全量淘汰
+            eventPublisher.publishEvent(new DocumentUpdateEvent(Set.of(documentId)));
 
             log.info("Document {} processed successfully: {} parents, {} children",
                     documentId, splitResult.parentSegments().size(), splitResult.childSegments().size());
