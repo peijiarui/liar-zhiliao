@@ -27,6 +27,9 @@ import io.micrometer.core.instrument.Timer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.nio.charset.StandardCharsets;
+
+import org.springframework.util.DigestUtils;
 
 /**
  * @author liar
@@ -48,34 +51,58 @@ public class KnowledgeRetrievalTool {
 
     @Tool("检索企业知识库：查找公司制度、政策、流程、产品信息等企业内部知识。仅当用户明确询问企业内部知识时调用，日常闲聊无需调用")
     public String retrieveKnowledge(@P("查询内容") String query) {
-        // Step 1: 查询改写（计时）
-        List<String> subQueries;
-        Timer.Sample rewriteSample = retrievalMetrics.startTimer(); // 查询改写耗时埋点
-        try {
-            subQueries = rewriteQuery(query);   // 查询改写
-        } finally {
-            rewriteSample.stop(retrievalMetrics.getRewrite()); // 埋点结束，必须调用stop
-        }
-        if (subQueries.isEmpty()) {
-            subQueries = List.of(query);
-        }
-        log.debug("Rewritten queries: {}", subQueries);
+        // Step 0: 查询规范化
+        String normalized = normalize(query);
 
-        // 计算部门后缀用于缓存隔离
+        // 规范化后为空的极端情况，回退使用 MD5 兜底
+        String canonicalKey = normalized.isEmpty()
+                ? DigestUtils.md5DigestAsHex(query.getBytes(StandardCharsets.UTF_8))
+                : normalized;
+
+        // Step 1: 部门后缀（用于缓存 key 权限隔离）
         String deptSuffix = extractDeptSuffix();
 
-        // Step 2: 尝试 Level 2 缓存（检索结果缓存）
-        List<RankedChunk> ranked = tryCache(query, subQueries, deptSuffix);
+        // Step 2: 尝试从 rewrite 缓存获取改写结果
+        List<String> subQueries;
+        String rewritten = retrievalCacheService.getRewrite(canonicalKey);
+        if (rewritten != null) {
+            String[] parts = rewritten.split("\\n");
+            subQueries = Arrays.stream(parts).map(String::trim).filter(s -> !s.isEmpty()).toList();
+            log.debug("Rewrite cache hit for '{}': {}", canonicalKey, rewritten);
+        } else if (!normalized.equals(query)) {
+            // normalize 后有变化，说明需要 LLM 改写
+            Timer.Sample rewriteSample = retrievalMetrics.startTimer();
+            try {
+                subQueries = rewriteQuery(query);
+            } finally {
+                rewriteSample.stop(retrievalMetrics.getRewrite());
+            }
+            if (subQueries.isEmpty()) {
+                subQueries = List.of(canonicalKey);
+            }
+            // 缓存改写结果
+            String joined = String.join("\n", subQueries);
+            retrievalCacheService.putRewrite(canonicalKey, joined);
+        } else {
+            // normalize 后无变化（如 "请假流程" 已是规范形态），直接用原值
+            subQueries = List.of(canonicalKey);
+            // 同时填充 rewrite 缓存，确保后续请求可以命中
+            retrievalCacheService.putRewrite(canonicalKey, canonicalKey);
+        }
+
+        // Step 3: 尝试从 retrieval 缓存获取检索结果（使用 canonicalKey 而非原始 query）
+        List<RankedChunk> ranked = retrievalCacheService.getCachedRetrieval(canonicalKey, deptSuffix);
         if (ranked != null) {
+            log.debug("Retrieval cache hit for key: {}:{}", canonicalKey, deptSuffix);
             return ranked.isEmpty() ? "" : buildContextFromRanked(ranked);
         }
 
-        // Step 3: 对每个子查询执行双路检索
+        // Step 4: 对每个子查询执行双路检索
         List<EmbeddingMatch<TextSegment>> allDenseResults = new ArrayList<>();
         List<SparseSearchResult> allSparseResults = new ArrayList<>();
 
         for (String subQuery : subQueries) {
-            // 3a: Milvus 稠密检索（计时）
+            // 4a: Milvus 稠密检索（计时）
             log.debug("======== 调用向量模型获取向量 ========");
             Embedding queryEmbedding = embeddingModel.embed(subQuery).content();
             EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
@@ -92,7 +119,7 @@ public class KnowledgeRetrievalTool {
                 denseSample.stop(retrievalMetrics.getDenseSearch());    // 埋点结束，必须调用stop
             }
 
-            // 3b: PG BM25 稀疏检索（计时）
+            // 4b: PG BM25 稀疏检索（计时）
             CurrentUser currentUser = UserContextHolder.get();
             List<Long> visibleDeptIds = currentUser != null
                     ? currentUser.visibleDeptIds()
@@ -106,50 +133,25 @@ public class KnowledgeRetrievalTool {
             }
         }
 
-        // Step 4: RRF 融合排序
+        // Step 5: RRF 融合排序
         ranked = reranker.rerank(query, allDenseResults, allSparseResults, 10);
         retrievalMetrics.recordRrfResultCount(ranked.size());
 
-        // Step 5: 空结果计数 + 写入 Level 2 缓存
+        // Step 6: 空结果计数
         if (ranked.isEmpty()) {
             retrievalMetrics.getEmptyResult().increment();
             return "";
         }
-        putCache(query, subQueries, deptSuffix, ranked);
 
-        // Step 6: 父子文档替换 + 构建上下文
+        // Step 7: 写入 retrieval 缓存（使用 canonicalKey）
+        retrievalCacheService.putRetrieval(canonicalKey, deptSuffix, ranked);
+
+        // Step 8: 父子文档替换 + 构建上下文
         return buildContextFromRanked(ranked);
     }
 
     /**
-     * 尝试从 Level 2 缓存读取检索结果。
-     * 仅对未改写（单子查询 = 原始 query）的情况生效。
-     *
-     * @return 缓存的 RankedChunk 列表，未命中返回 null
-     */
-    private List<RankedChunk> tryCache(String query, List<String> subQueries, String deptSuffix) {
-        if (subQueries.size() == 1 && subQueries.get(0).equals(query)) {
-            List<RankedChunk> cached = retrievalCacheService.getCachedRetrieval(query, deptSuffix);
-            if (cached != null) {
-                log.debug("Level 2 cache hit for query: {}", query);
-                return cached;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 写入 Level 2 缓存。仅对未改写的单子查询缓存，
-     * 避免组合子查询场景导致缓存膨胀。
-     */
-    private void putCache(String query, List<String> subQueries, String deptSuffix, List<RankedChunk> ranked) {
-        if (subQueries.size() == 1 && subQueries.get(0).equals(query)) {
-            retrievalCacheService.putRetrieval(query, deptSuffix, ranked);
-        }
-    }
-
-    /**
-     * 从当前用户上下文中提取部门 ID 后缀，用于缓存 key 的权限隔离。
+     * 从当前用户上下文中提取部门 ID 后缀。
      */
     private String extractDeptSuffix() {
         CurrentUser currentUser = UserContextHolder.get();
@@ -159,6 +161,20 @@ public class KnowledgeRetrievalTool {
         return deptIds.stream()
                 .map(String::valueOf)
                 .collect(java.util.stream.Collectors.joining("_"));
+    }
+
+    /**
+     * 将用户查询归一化为规范形态，去除语气词、标点符号和重复词。
+     * 若结果为空，调用方应使用 MD5(原始查询) 作为兜底。
+     */
+    static String normalize(String raw) {
+        if (raw == null || raw.isBlank()) return "";
+        String s = raw.trim();
+        s = s.replaceAll("^(请问|我想问|我要|我想|我来|我查一下|帮我|能不能|可以|麻烦)", "");
+        s = s.replaceAll("(是什么|怎么做|如何操作|怎么弄|怎么办|有哪些|在哪|怎么走|呢|吗|啊|呀|嘛|哦)$", "");
+        s = s.replaceAll("[\\pP\\pZ\\s]", "");
+        s = s.replaceAll("(.+?)\\1+", "$1");
+        return s;
     }
 
     /**
