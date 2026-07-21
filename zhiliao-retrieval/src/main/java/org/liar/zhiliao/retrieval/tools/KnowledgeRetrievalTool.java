@@ -59,6 +59,11 @@ public class KnowledgeRetrievalTool {
                 ? DigestUtils.md5DigestAsHex(query.getBytes(StandardCharsets.UTF_8))
                 : normalized;
 
+        // 超长规范化查询（>200字符）压缩为 MD5，避免 Redis key 过长
+        if (canonicalKey.length() > 200) {
+            canonicalKey = DigestUtils.md5DigestAsHex(canonicalKey.getBytes(StandardCharsets.UTF_8));
+        }
+
         // Step 1: 部门后缀（用于缓存 key 权限隔离）
         String deptSuffix = extractDeptSuffix();
 
@@ -79,10 +84,11 @@ public class KnowledgeRetrievalTool {
             }
             if (subQueries.isEmpty()) {
                 subQueries = List.of(canonicalKey);
+            } else {
+                // 缓存改写结果（仅 LLM 成功返回时）
+                String joined = String.join("\n", subQueries);
+                retrievalCacheService.putRewrite(canonicalKey, joined);
             }
-            // 缓存改写结果
-            String joined = String.join("\n", subQueries);
-            retrievalCacheService.putRewrite(canonicalKey, joined);
         } else {
             // normalize 后无变化（如 "请假流程" 已是规范形态），直接用原值
             subQueries = List.of(canonicalKey);
@@ -158,7 +164,13 @@ public class KnowledgeRetrievalTool {
         List<Long> deptIds = currentUser != null
                 ? currentUser.visibleDeptIds()
                 : List.of(1L);
-        return deptIds.stream()
+        // 排序保证相同部门集合产生相同的缓存 key 后缀
+        List<Long> sorted = new ArrayList<>(deptIds);
+        sorted.sort(Long::compareTo);
+        if (sorted.isEmpty()) {
+            sorted = new ArrayList<>(List.of(1L));
+        }
+        return sorted.stream()
                 .map(String::valueOf)
                 .collect(java.util.stream.Collectors.joining("_"));
     }

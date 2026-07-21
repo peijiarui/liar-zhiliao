@@ -29,8 +29,8 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>缓存区：</p>
  * <ul>
- *   <li>{@code query_rewrite} — 改写结果缓存，L1 10min / L2 1h，MD5(query) → 改写后的 query</li>
- *   <li>{@code retrieval_result} — 检索结果缓存，L1 10min / L2 24h，MD5(query) → Top chunk 列表</li>
+ *   <li>{@code query_rewrite} — 改写结果缓存，L1 10min / L2 1h，normalized(query) → 改写后的查询</li>
+ *   <li>{@code retrieval_result} — 检索结果缓存，L1 10min / L2 24h，normalized(query):deptSuffix → Top chunk 列表</li>
  * </ul>
  */
 @Configuration

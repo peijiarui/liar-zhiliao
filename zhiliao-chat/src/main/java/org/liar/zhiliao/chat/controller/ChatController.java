@@ -21,7 +21,7 @@ import reactor.core.publisher.Flux;
  * 对话控制器。
  * Sentinel 资源名 "chat"：
  * - 限流：单用户每分钟 5 次（用户维度）
- * - 熔断：LLM API 异常时降级到缓存 → 文档片段
+ * - 熔断：LLM API 异常时降级到知识库文档片段
  */
 @Slf4j
 @RequiredArgsConstructor
