@@ -22,14 +22,14 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>架构：</p>
  * <pre>
- * 请求 → L1 Caffeine（JVM 堆内，<0.01ms，1000 条，10min TTL）
+ * 请求 → L1 Caffeine（JVM 堆内，<0.01ms，2000 条，10min TTL）
  *          → 未命中 → L2 Redis（分布式，~1ms，1h/24h TTL）
  *                        → 未命中 → 实际调用（LLM/检索）
  * </pre>
  *
  * <p>缓存区：</p>
  * <ul>
- *   <li>{@code qa_answer} — 热点问答缓存，L1 10min / L2 1h，MD5(query) → 完整答案</li>
+ *   <li>{@code query_rewrite} — 改写结果缓存，L1 10min / L2 1h，MD5(query) → 改写后的 query</li>
  *   <li>{@code retrieval_result} — 检索结果缓存，L1 10min / L2 24h，MD5(query) → Top chunk 列表</li>
  * </ul>
  */
@@ -40,10 +40,11 @@ public class CacheConfig {
     /** L1 Caffeine 缓存管理器 */
     @Bean
     public CacheManager caffeineCacheManager() {
-        CaffeineCacheManager manager = new CaffeineCacheManager("qa_answer", "retrieval_result");
+        CaffeineCacheManager manager = new CaffeineCacheManager("query_rewrite", "retrieval_result");
         manager.setCaffeine(Caffeine.newBuilder()
-
-                .maximumSize(1000)
+                // 缓存上限2000条（rewrite + retrieval 共享），防止内存泄漏
+                .maximumSize(2000)
+                // 缓存10min
                 .expireAfterWrite(10, TimeUnit.MINUTES)
                 .recordStats());
         return manager;
@@ -62,13 +63,13 @@ public class CacheConfig {
                         .serializeKeysWith(stringKey)
                         .serializeValuesWith(jsonValue)
                         .disableCachingNullValues())
-                // 热点问题的答案缓存1小时
-                .withCacheConfiguration("qa_answer",
+                // 改写结果缓存1小时
+                .withCacheConfiguration("query_rewrite",
                         RedisCacheConfiguration.defaultCacheConfig()
                                 .serializeKeysWith(stringKey)
                                 .serializeValuesWith(jsonValue)
                                 .entryTtl(Duration.ofHours(1))
-                                .prefixCacheNameWith("cache:qa:")
+                                .prefixCacheNameWith("cache:rewrite:")
                                 .disableCachingNullValues())
                 // 检索结果缓存24小时
                 .withCacheConfiguration("retrieval_result",
