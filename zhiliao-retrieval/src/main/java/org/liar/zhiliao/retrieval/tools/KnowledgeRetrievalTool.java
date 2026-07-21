@@ -50,19 +50,22 @@ public class KnowledgeRetrievalTool {
     public String retrieveKnowledge(@P("查询内容") String query) {
         // Step 1: 查询改写（计时）
         List<String> subQueries;
-        Timer.Sample rewriteSample = retrievalMetrics.startTimer();
+        Timer.Sample rewriteSample = retrievalMetrics.startTimer(); // 查询改写耗时埋点
         try {
-            subQueries = rewriteQuery(query);
+            subQueries = rewriteQuery(query);   // 查询改写
         } finally {
-            rewriteSample.stop(retrievalMetrics.getRewrite());
+            rewriteSample.stop(retrievalMetrics.getRewrite()); // 埋点结束，必须调用stop
         }
         if (subQueries.isEmpty()) {
             subQueries = List.of(query);
         }
         log.debug("Rewritten queries: {}", subQueries);
 
+        // 计算部门后缀用于缓存隔离
+        String deptSuffix = extractDeptSuffix();
+
         // Step 2: 尝试 Level 2 缓存（检索结果缓存）
-        List<RankedChunk> ranked = tryCache(query, subQueries);
+        List<RankedChunk> ranked = tryCache(query, subQueries, deptSuffix);
         if (ranked != null) {
             return ranked.isEmpty() ? "" : buildContextFromRanked(ranked);
         }
@@ -81,12 +84,12 @@ public class KnowledgeRetrievalTool {
                     .minScore(0.5)
                     .build();
             log.debug("======== 稠密检索：调用向量数据库进行相似度匹配 ========");
-            Timer.Sample denseSample = retrievalMetrics.startTimer();
+            Timer.Sample denseSample = retrievalMetrics.startTimer();   // 稠密检索耗时统计埋点
             try {
                 EmbeddingSearchResult<TextSegment> result = milvusEmbeddingStore.search(request);
                 allDenseResults.addAll(result.matches());
             } finally {
-                denseSample.stop(retrievalMetrics.getDenseSearch());
+                denseSample.stop(retrievalMetrics.getDenseSearch());    // 埋点结束，必须调用stop
             }
 
             // 3b: PG BM25 稀疏检索（计时）
@@ -95,11 +98,11 @@ public class KnowledgeRetrievalTool {
                     ? currentUser.visibleDeptIds()
                     : List.of(1L);
             log.debug("======== 稀疏检索：调用PG进行关键词匹配 ========");
-            Timer.Sample sparseSample = retrievalMetrics.startTimer();
+            Timer.Sample sparseSample = retrievalMetrics.startTimer();  // 稀疏检索耗时统计埋点
             try {
                 allSparseResults.addAll(sparseSearcher.search(subQuery, 10, visibleDeptIds));
             } finally {
-                sparseSample.stop(retrievalMetrics.getSparseSearch());
+                sparseSample.stop(retrievalMetrics.getSparseSearch());  // 埋点结束，必须调用stop
             }
         }
 
@@ -112,7 +115,7 @@ public class KnowledgeRetrievalTool {
             retrievalMetrics.getEmptyResult().increment();
             return "";
         }
-        putCache(query, subQueries, ranked);
+        putCache(query, subQueries, deptSuffix, ranked);
 
         // Step 6: 父子文档替换 + 构建上下文
         return buildContextFromRanked(ranked);
@@ -124,9 +127,9 @@ public class KnowledgeRetrievalTool {
      *
      * @return 缓存的 RankedChunk 列表，未命中返回 null
      */
-    private List<RankedChunk> tryCache(String query, List<String> subQueries) {
+    private List<RankedChunk> tryCache(String query, List<String> subQueries, String deptSuffix) {
         if (subQueries.size() == 1 && subQueries.get(0).equals(query)) {
-            List<RankedChunk> cached = retrievalCacheService.getCachedRetrieval(query);
+            List<RankedChunk> cached = retrievalCacheService.getCachedRetrieval(query, deptSuffix);
             if (cached != null) {
                 log.debug("Level 2 cache hit for query: {}", query);
                 return cached;
@@ -139,10 +142,23 @@ public class KnowledgeRetrievalTool {
      * 写入 Level 2 缓存。仅对未改写的单子查询缓存，
      * 避免组合子查询场景导致缓存膨胀。
      */
-    private void putCache(String query, List<String> subQueries, List<RankedChunk> ranked) {
+    private void putCache(String query, List<String> subQueries, String deptSuffix, List<RankedChunk> ranked) {
         if (subQueries.size() == 1 && subQueries.get(0).equals(query)) {
-            retrievalCacheService.putRetrieval(query, ranked);
+            retrievalCacheService.putRetrieval(query, deptSuffix, ranked);
         }
+    }
+
+    /**
+     * 从当前用户上下文中提取部门 ID 后缀，用于缓存 key 的权限隔离。
+     */
+    private String extractDeptSuffix() {
+        CurrentUser currentUser = UserContextHolder.get();
+        List<Long> deptIds = currentUser != null
+                ? currentUser.visibleDeptIds()
+                : List.of(1L);
+        return deptIds.stream()
+                .map(String::valueOf)
+                .collect(java.util.stream.Collectors.joining("_"));
     }
 
     /**
