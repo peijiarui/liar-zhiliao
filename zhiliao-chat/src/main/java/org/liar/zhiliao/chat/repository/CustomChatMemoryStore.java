@@ -38,7 +38,7 @@ public class CustomChatMemoryStore implements ChatMemoryStore {
     @Override
     public void updateMessages(Object memoryId, List<ChatMessage> messages) {
 
-//        //1.截断工具执行结果，避免存储冗余的大文本，仅保留一部分
+//        //1.截断工具执行结果，避免存储冗余的大文本，仅保留一部分，模型也只能看到截取的检索内容，会损伤 RAG 回答质量，不可取
 //        List<ChatMessage> processedMessages = messages.stream()
 //                .map(m -> {
 //                    if (m instanceof ToolExecutionResultMessage toolMsg && toolMsg.hasSingleText()) {
