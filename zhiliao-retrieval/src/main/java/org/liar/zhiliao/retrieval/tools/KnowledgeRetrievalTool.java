@@ -24,9 +24,8 @@ import org.liar.zhiliao.retrieval.service.SparseSearcher;
 import org.springframework.stereotype.Component;
 
 import io.micrometer.core.instrument.Timer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+
+import java.util.*;
 import java.nio.charset.StandardCharsets;
 
 import org.springframework.util.DigestUtils;
@@ -104,7 +103,9 @@ public class KnowledgeRetrievalTool {
         }
 
         // Step 4: 对每个子查询执行双路检索
+        // 稠密检索结果集
         List<EmbeddingMatch<TextSegment>> allDenseResults = new ArrayList<>();
+        // 稀疏检索结果集
         List<SparseSearchResult> allSparseResults = new ArrayList<>();
 
         for (String subQuery : subQueries) {
@@ -195,10 +196,15 @@ public class KnowledgeRetrievalTool {
      */
     private String buildContextFromRanked(List<RankedChunk> ranked) {
         StringBuilder context = new StringBuilder();
+        Set<Long> uniqueChunkParentIdSets = new HashSet<>();
         for (RankedChunk chunk : ranked) {
             String content;
             if (chunk.parentId() != null) {
                 try {
+                    if (!uniqueChunkParentIdSets.add(chunk.parentId())) {
+                        // parent 已经处理过了不需要再次拼接了
+                        continue;
+                    }
                     content = chunkRepository.findContentById(chunk.parentId());
                 } catch (Exception e) {
                     log.warn("Parent content not found for parentId={}, using child content", chunk.parentId());

@@ -10,8 +10,17 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
+    /**
+     * 交换机名称
+     */
     public static final String EXCHANGE = "zhiliao.direct";
+    /**
+     * 队列名称
+     */
     public static final String QUEUE = "zhiliao.document.process";
+    /**
+     * 路由键
+     */
     public static final String ROUTING_KEY = "document.process";
 
     @Bean

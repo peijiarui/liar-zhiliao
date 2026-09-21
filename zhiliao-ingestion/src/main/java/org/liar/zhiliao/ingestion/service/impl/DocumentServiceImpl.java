@@ -43,6 +43,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final ZlKbDeptVisibilityMapper visibilityMapper;
     private final RabbitTemplate rabbitTemplate;
 
+    @Override
     public ZlDocument upload(MultipartFile file, Long kbId) {
         // 1. Compute MD5
         String fileMd5;

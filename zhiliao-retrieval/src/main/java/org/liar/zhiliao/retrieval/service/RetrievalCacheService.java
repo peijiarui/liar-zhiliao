@@ -31,7 +31,7 @@ public class RetrievalCacheService {
      * @param normalizedQuery normalize() 后的规范化查询
      * @return 改写后的查询文本，未命中返回 null
      */
-    @Cacheable(value = "query_rewrite")
+    @Cacheable(value = "query_rewrite", unless = "#result == null")
     public String getRewrite(String normalizedQuery) {
         return null;
     }
