@@ -48,13 +48,13 @@ langchain4j:
     chat-model:
       base-url: https://api.deepseek.com
       api-key: ${DEEPSEEK_API_KEY}
-      model-name: deepseek-v4-flash
+      model-name: deepseek-flash
       log-requests: true
       log-responses: true
     streaming-chat-model:
       base-url: https://api.deepseek.com
       api-key: ${DEEPSEEK_API_KEY}
-      model-name: deepseek-v4-flash
+      model-name: deepseek-flash
       log-requests: true
       log-responses: true
     embedding-model:
@@ -63,7 +63,7 @@ langchain4j:
       model-name: text-embedding-v4
       max-segments-per-batch: 10
       log-requests: true
-      log-responses: true
+      log-responses: false
   milvus:
     host: ${RESOURCE_SERVER_HOST}
     port: 19530
@@ -85,6 +85,8 @@ mybatis-plus:
 logging:
   level:
     dev.langchain4j: debug
+    # 关闭 HTTP 客户端的 SSE chunk 流式日志（每个 token 一行，量太大）
+    dev.langchain4j.http.client.log.LoggingHttpClient: info
     org.liar.zhiliao.retrieval: debug
 #    org.springframework.context.support.DefaultListableBeanFactory: debug
 

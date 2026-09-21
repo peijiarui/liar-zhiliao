@@ -39,11 +39,17 @@ public class RetrievalCacheService {
     /**
      * 写入查询改写缓存。
      *
+     * <p>key 必须与 getRewrite 一致（均为 normalizedQuery 字符串），
+     * 否则写入后永远无法命中；@CachePut 缓存的是方法返回值，
+     * 因此方法需返回 rewriteResult 而非 void。</p>
+     *
      * @param normalizedQuery normalize() 后的规范化查询
      * @param rewriteResult   LLM 改写后的查询文本
+     * @return 写入的改写结果
      */
-    @CachePut(value = "query_rewrite")
-    public void putRewrite(String normalizedQuery, String rewriteResult) {
+    @CachePut(value = "query_rewrite", key = "#normalizedQuery", unless = "#result == null")
+    public String putRewrite(String normalizedQuery, String rewriteResult) {
+        return rewriteResult;
     }
 
     /**
@@ -64,7 +70,7 @@ public class RetrievalCacheService {
      * @param deptSuffix     部门 ID 后缀，格式 "deptId1_deptId2"，由调用方计算
      * @return 缓存的 RankedChunk 列表，未命中返回 null
      */
-    @Cacheable(value = "retrieval_result", key = "#canonicalQuery + ':' + #deptSuffix")
+    @Cacheable(value = "retrieval_result", key = "#canonicalQuery + ':' + #deptSuffix", unless = "#result == null")
     public List<RankedChunk> getCachedRetrieval(String canonicalQuery, String deptSuffix) {
         return null;
     }
