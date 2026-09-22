@@ -1,6 +1,7 @@
 package org.liar.zhiliao.retrieval.repository;
 
 import lombok.RequiredArgsConstructor;
+import org.liar.zhiliao.retrieval.records.RetrievalPrincipal;
 import org.liar.zhiliao.retrieval.records.SparseSearchResult;
 import org.springframework.jdbc.core.DataClassRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -67,5 +68,25 @@ public class ChunkRepository {
     public String findContentById(Long id) {
         String sql = "SELECT content FROM zl_chunk WHERE id = ?";
         return jdbcTemplate.queryForObject(sql, String.class, id);
+    }
+
+    /** 按 memoryId 解析会话归属用户（join sys_user 取实时 role/deptId）；会话或用户不存在返回 null */
+    public RetrievalPrincipal findPrincipalByMemoryId(String memoryId) {
+        String sql = """
+            SELECT u.id AS userId, u.role AS role, u.dept_id AS deptId
+            FROM zl_conversation c
+            JOIN sys_user u ON u.id = c.user_id
+            WHERE c.memory_id = ?
+            LIMIT 1
+            """;
+        List<RetrievalPrincipal> rows = jdbcTemplate.query(
+                sql, new DataClassRowMapper<>(RetrievalPrincipal.class), memoryId);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    /** 部门可见的知识库 ID 集合（来自 zl_kb_dept_visibility） */
+    public List<Long> findVisibleKbIds(Long deptId) {
+        String sql = "SELECT kb_id FROM zl_kb_dept_visibility WHERE dept_id = ?";
+        return jdbcTemplate.queryForList(sql, Long.class, deptId);
     }
 }

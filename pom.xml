@@ -107,6 +107,12 @@
                 <artifactId>langchain4j-easy-rag</artifactId>
                 <version>${langchain4j.version}</version>
             </dependency>
+            <!-- 主 jar 只随稳定版本发布（1.17.0-beta27 不存在），beta 系模块本身即依赖 1.17.0 -->
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j</artifactId>
+                <version>1.17.0</version>
+            </dependency>
 
             <dependency>
                 <groupId>dev.langchain4j</groupId>
