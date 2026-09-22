@@ -187,4 +187,27 @@ class DocumentServiceImplTest {
         verify(documentMapper).deleteById(2L);
         verify(eventPublisher).publishEvent(any(org.liar.zhiliao.common.event.DocumentUpdateEvent.class));
     }
+
+    @Test
+    void reprocessShouldResetStatusAndSendMq() {
+        org.liar.zhiliao.ingestion.entity.ZlDocument doc =
+                org.liar.zhiliao.ingestion.entity.ZlDocument.builder()
+                        .id(1L).minioKey("docs/1/x/a.txt").fileName("a.txt").build();
+        when(documentMapper.selectById(1L)).thenReturn(doc);
+
+        service.reprocess(1L);
+
+        assertEquals("UPLOADED", doc.getStatus());
+        verify(documentMapper).updateById(doc);
+        ArgumentCaptor<DocumentMessage> msg = ArgumentCaptor.forClass(DocumentMessage.class);
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.EXCHANGE), eq(RabbitMQConfig.ROUTING_KEY), msg.capture());
+        assertEquals("docs/1/x/a.txt", msg.getValue().getMinioKey());
+    }
+
+    @Test
+    void reprocessShouldIgnoreMissingDocument() {
+        when(documentMapper.selectById(99L)).thenReturn(null);
+        assertDoesNotThrow(() -> service.reprocess(99L));
+        verifyNoInteractions(rabbitTemplate);
+    }
 }

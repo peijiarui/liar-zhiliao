@@ -18,6 +18,7 @@ import org.liar.zhiliao.ingestion.config.MinIOConfig;
 import org.liar.zhiliao.ingestion.config.RabbitMQConfig;
 import org.liar.zhiliao.ingestion.entity.ZlChunk;
 import org.liar.zhiliao.ingestion.entity.ZlDocument;
+import org.liar.zhiliao.ingestion.enums.DocumentStatusEnum;
 import org.liar.zhiliao.ingestion.mapper.ZlChunkMapper;
 import org.liar.zhiliao.ingestion.mapper.ZlDocumentMapper;
 import org.liar.zhiliao.ingestion.model.DocumentMessage;
@@ -191,6 +192,23 @@ public class DocumentServiceImpl implements DocumentService {
         // 4. 发布文档更新事件 → 全量淘汰检索缓存
         eventPublisher.publishEvent(new DocumentUpdateEvent(Set.of(id)));
         log.info("Document {} deleted physically", id);
+    }
+
+    @Override
+    public void reprocess(Long id) {
+        ZlDocument doc = documentMapper.selectById(id);
+        if (doc == null) {
+            return;
+        }
+        doc.setStatus(DocumentStatusEnum.UPLOADED.getStatus());
+        documentMapper.updateById(doc);
+        DocumentMessage message = DocumentMessage.builder()
+                .documentId(doc.getId())
+                .minioKey(doc.getMinioKey())
+                .fileName(doc.getFileName())
+                .build();
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, RabbitMQConfig.ROUTING_KEY, message);
+        log.info("Document {} queued for reprocess", id);
     }
 
 }

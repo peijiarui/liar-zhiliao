@@ -15,4 +15,6 @@ public interface DocumentService {
     List<ZlDocument> listDocuments(Long kbId, Integer page, Integer pageSize);
 
     void delete(Long id);
+
+    void reprocess(Long id);
 }
