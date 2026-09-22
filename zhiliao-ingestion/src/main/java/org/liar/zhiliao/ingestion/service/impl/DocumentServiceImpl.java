@@ -3,21 +3,27 @@ package org.liar.zhiliao.ingestion.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.store.embedding.EmbeddingStore;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.liar.zhiliao.common.event.DocumentUpdateEvent;
 import org.liar.zhiliao.common.exception.BusinessException;
 import org.liar.zhiliao.common.mapper.ZlKbDeptVisibilityMapper;
 import org.liar.zhiliao.ingestion.config.MinIOConfig;
 import org.liar.zhiliao.ingestion.config.RabbitMQConfig;
+import org.liar.zhiliao.ingestion.entity.ZlChunk;
 import org.liar.zhiliao.ingestion.entity.ZlDocument;
 import org.liar.zhiliao.ingestion.mapper.ZlChunkMapper;
 import org.liar.zhiliao.ingestion.mapper.ZlDocumentMapper;
 import org.liar.zhiliao.ingestion.model.DocumentMessage;
 import org.liar.zhiliao.ingestion.service.DocumentService;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -25,6 +31,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 import org.liar.zhiliao.common.model.CurrentUser;
@@ -49,6 +57,8 @@ public class DocumentServiceImpl implements DocumentService {
     private final ZlChunkMapper chunkMapper;
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
+    private final EmbeddingStore<TextSegment> milvusEmbeddingStore;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public ZlDocument upload(MultipartFile file, Long kbId) {
@@ -141,6 +151,46 @@ public class DocumentServiceImpl implements DocumentService {
             return p.getRecords();
         }
         return documentMapper.selectList(wrapper);
+    }
+
+    @Override
+    public void delete(Long id) {
+        ZlDocument doc = documentMapper.selectById(id);
+        if (doc == null) {
+            throw new BusinessException(404, "文档不存在: " + id);
+        }
+
+        // 1. 收集 child chunk 的向量 ID（最难恢复的数据先删，失败则中止）
+        List<ZlChunk> children = chunkMapper.selectList(Wrappers.<ZlChunk>lambdaQuery()
+                .eq(ZlChunk::getDocId, id)
+                .eq(ZlChunk::getChunkType, "child"));
+        List<String> embeddingIds = children.stream()
+                .map(ZlChunk::getEmbeddingId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (!embeddingIds.isEmpty()) {
+            milvusEmbeddingStore.removeAll(embeddingIds);
+        }
+
+        // 2. PG 事务删除（chunk + document）
+        transactionTemplate.executeWithoutResult(tx -> {
+            chunkMapper.delete(Wrappers.<ZlChunk>lambdaQuery().eq(ZlChunk::getDocId, id));
+            documentMapper.deleteById(id);
+        });
+
+        // 3. MinIO 对象尽力而为删除（残留孤儿对象无害，不阻断）
+        try {
+            minioClient.removeObject(RemoveObjectArgs.builder()
+                    .bucket(minIOConfig.getBucket())
+                    .object(doc.getMinioKey())
+                    .build());
+        } catch (Exception e) {
+            log.warn("MinIO object delete ignored: key={}, err={}", doc.getMinioKey(), e.getMessage());
+        }
+
+        // 4. 发布文档更新事件 → 全量淘汰检索缓存
+        eventPublisher.publishEvent(new DocumentUpdateEvent(Set.of(id)));
+        log.info("Document {} deleted physically", id);
     }
 
 }

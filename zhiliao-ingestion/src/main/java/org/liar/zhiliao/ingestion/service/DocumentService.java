@@ -13,4 +13,6 @@ public interface DocumentService {
     ZlDocument getDocument(Long id);
 
     List<ZlDocument> listDocuments(Long kbId, Integer page, Integer pageSize);
+
+    void delete(Long id);
 }
