@@ -6,7 +6,7 @@ import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
-import dev.langchain4j.service.MemoryId;
+import dev.langchain4j.agent.tool.ToolMemoryId;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
@@ -52,7 +52,7 @@ public class KnowledgeRetrievalTool {
     private final RetrievalMetrics retrievalMetrics;
 
     @Tool("检索企业知识库：查找公司制度、政策、流程、产品信息等企业内部知识。仅当用户明确询问企业内部知识时调用，日常闲聊无需调用")
-    public String retrieveKnowledge(@MemoryId String memoryId, @P("查询内容") String query) {
+    public String retrieveKnowledge(@ToolMemoryId String memoryId, @P("查询内容") String query) {
         // Step -1: 会话身份解析（替代 ThreadLocal，流式工具线程不可靠）
         RetrievalPrincipal principal = chunkRepository.findPrincipalByMemoryId(memoryId);
         if (principal == null) {
