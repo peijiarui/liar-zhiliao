@@ -1,5 +1,6 @@
 package org.liar.zhiliao.ingestion.consumer;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 @Slf4j
@@ -73,6 +75,9 @@ public class DocumentConsumerProcessor {
             ParentChildSplitResult splitResult = recursiveDocumentSplitter.split(text, documentId.toString());
             log.info("Document {} split into {} parents, {} children", documentId,
                     splitResult.parentSegments().size(), splitResult.childSegments().size());
+
+            // 幂等清理：移除该文档既有切片与向量，避免重处理重复插入（首次处理时为 no-op）
+            cleanupExistingChunks(documentId);
 
             // 5. 先写所有 parent 到 PG，获取自增 ID
             List<Long> parentIds = new ArrayList<>();
@@ -144,5 +149,29 @@ public class DocumentConsumerProcessor {
             doc.setStatus(DocumentStatusEnum.FAILED.getStatus());
             documentMapper.updateById(doc);
         }
+    }
+
+    /**
+     * 清理文档既有切片与向量（重处理幂等化）。
+     * 与 {@code DocumentServiceImpl#delete} 的清理步骤一致：先收集 child chunk 的
+     * embeddingId 删除 Milvus 向量（最难恢复的数据先删，失败则中止），再删除 zl_chunk 行。
+     * 首次处理时无旧数据，本方法为无害 no-op（Milvus removeAll 对空列表的行为不确定，
+     * 与 {@code DocumentServiceImpl#delete} 一致地显式跳过）。
+     */
+    private void cleanupExistingChunks(Long documentId) {
+        List<ZlChunk> existingChildren = chunkMapper.selectList(Wrappers.<ZlChunk>lambdaQuery()
+                .eq(ZlChunk::getDocId, documentId)
+                .eq(ZlChunk::getChunkType, "child"));
+        if (existingChildren.isEmpty()) {
+            return;
+        }
+        List<String> staleEmbeddingIds = existingChildren.stream()
+                .map(ZlChunk::getEmbeddingId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (!staleEmbeddingIds.isEmpty()) {
+            milvusEmbeddingStore.removeAll(staleEmbeddingIds);
+        }
+        chunkMapper.delete(Wrappers.<ZlChunk>lambdaQuery().eq(ZlChunk::getDocId, documentId));
     }
 }
