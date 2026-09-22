@@ -115,13 +115,14 @@ public class KnowledgeRetrievalTool {
             EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
                     .queryEmbedding(queryEmbedding)
                     .maxResults(10)
-                    .minScore(0.5)
+                    .minScore(0.7)
                     .build();
             log.debug("======== 稠密检索：调用向量数据库进行相似度匹配 ========");
             Timer.Sample denseSample = retrievalMetrics.startTimer();   // 稠密检索耗时统计埋点
             try {
                 EmbeddingSearchResult<TextSegment> result = milvusEmbeddingStore.search(request);
                 allDenseResults.addAll(result.matches());
+                log.debug("======== 稠密检索：结果数量：{} ========", result.matches().size());
             } finally {
                 denseSample.stop(retrievalMetrics.getDenseSearch());    // 埋点结束，必须调用stop
             }
@@ -134,7 +135,9 @@ public class KnowledgeRetrievalTool {
             log.debug("======== 稀疏检索：调用PG进行关键词匹配 ========");
             Timer.Sample sparseSample = retrievalMetrics.startTimer();  // 稀疏检索耗时统计埋点
             try {
-                allSparseResults.addAll(sparseSearcher.search(subQuery, 10, visibleDeptIds));
+                List<SparseSearchResult> results = sparseSearcher.search(subQuery, 10, visibleDeptIds);
+                log.debug("======== 稀疏检索：结果数量：{} ========", results.size());
+                allSparseResults.addAll(results);
             } finally {
                 sparseSample.stop(retrievalMetrics.getSparseSearch());  // 埋点结束，必须调用stop
             }

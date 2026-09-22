@@ -33,6 +33,7 @@ public class RrfReranker implements Reranker {
             String parentIdStr = meta.getString("parentId");
 
             double score = 1.0 / (K + rank + 1);   // RRF: 1/(k+rank), rank 从 0 开始
+            log.info("稠密检索：chunkId: {}, parentId: {}, content: {}, score: {}", chunkId, parentIdStr, match.embedded().text().substring(0, 10), score);
             RrfEntry entry = scoreMap.getOrDefault(chunkId,
                     new RrfEntry(0, match.embedded().text(),
                             parentIdStr.isEmpty() ? null : Long.parseLong(parentIdStr)));
@@ -47,6 +48,7 @@ public class RrfReranker implements Reranker {
             RrfEntry entry = scoreMap.getOrDefault(result.id(),
                     new RrfEntry(0, result.content(), null));
             entry.score += score;
+            log.info("稀疏检索：chunkId: {}, content: {}, score: {}", result.id(), result.content().substring(0, 10), score);
             scoreMap.put(result.id(), entry);
         }
 
