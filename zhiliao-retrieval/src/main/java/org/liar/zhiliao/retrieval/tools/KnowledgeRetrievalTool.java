@@ -10,8 +10,6 @@ import dev.langchain4j.agent.tool.ToolMemoryId;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
-import dev.langchain4j.store.embedding.EmbeddingStore;
-import dev.langchain4j.store.embedding.filter.Filter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.liar.zhiliao.retrieval.repository.ChunkRepository;
@@ -22,11 +20,10 @@ import org.liar.zhiliao.retrieval.records.SparseSearchResult;
 import org.liar.zhiliao.retrieval.service.RetrievalCacheService;
 import org.liar.zhiliao.retrieval.service.RetrievalMetrics;
 import org.liar.zhiliao.retrieval.service.SparseSearcher;
+import org.liar.zhiliao.vector.KbAwareEmbeddingStore;
 import org.springframework.stereotype.Component;
 
 import io.micrometer.core.instrument.Timer;
-
-import static dev.langchain4j.store.embedding.filter.MetadataFilterBuilder.metadataKey;
 
 import java.util.*;
 import java.nio.charset.StandardCharsets;
@@ -43,7 +40,7 @@ import org.springframework.util.DigestUtils;
 public class KnowledgeRetrievalTool {
 
     private final EmbeddingModel embeddingModel;
-    private final EmbeddingStore<TextSegment> milvusEmbeddingStore;
+    private final KbAwareEmbeddingStore milvusEmbeddingStore;
     private final SparseSearcher sparseSearcher;
     private final Reranker reranker;
     private final ChunkRepository chunkRepository;
@@ -67,10 +64,8 @@ public class KnowledgeRetrievalTool {
             log.info("User {} has no visible knowledge bases, return empty", principal.userId());
             return "";
         }
-        // Milvus metadata 的 kbId 为字符串形式
-        Filter kbFilter = admin
-                ? null
-                : metadataKey("kbId").isIn(visibleKbIds.stream().map(String::valueOf).toList());
+        // kb_id 是顶层分区键字段：null 表示不过滤（admin），单值走 ==，多值走 in [...]
+        List<Long> kbIds = admin ? null : visibleKbIds;
 
         // Step 0: 查询规范化
         String normalized = normalize(query);
@@ -134,18 +129,15 @@ public class KnowledgeRetrievalTool {
             // 4a: Milvus 稠密检索（计时）
             log.debug("======== 调用向量模型获取向量 ========");
             Embedding queryEmbedding = embeddingModel.embed(subQuery).content();
-            var requestBuilder = EmbeddingSearchRequest.builder()
+            EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
                     .queryEmbedding(queryEmbedding)
                     .maxResults(10)
-                    .minScore(0.7);
-            if (kbFilter != null) {
-                requestBuilder.filter(kbFilter);
-            }
-            EmbeddingSearchRequest request = requestBuilder.build();
+                    .minScore(0.7)
+                    .build();
             log.debug("======== 稠密检索：调用向量数据库进行相似度匹配 ========");
             Timer.Sample denseSample = retrievalMetrics.startTimer();   // 稠密检索耗时统计埋点
             try {
-                EmbeddingSearchResult<TextSegment> result = milvusEmbeddingStore.search(request);
+                EmbeddingSearchResult<TextSegment> result = milvusEmbeddingStore.search(request, kbIds);
                 allDenseResults.addAll(result.matches());
                 log.debug("======== 稠密检索：结果数量：{} ========", result.matches().size());
             } finally {

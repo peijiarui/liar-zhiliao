@@ -8,9 +8,6 @@ import dev.langchain4j.model.output.Response;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
-import dev.langchain4j.store.embedding.EmbeddingStore;
-import dev.langchain4j.store.embedding.filter.Filter;
-import dev.langchain4j.store.embedding.filter.comparison.IsIn;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,11 +20,11 @@ import org.liar.zhiliao.retrieval.service.Reranker;
 import org.liar.zhiliao.retrieval.service.RetrievalCacheService;
 import org.liar.zhiliao.retrieval.service.RetrievalMetrics;
 import org.liar.zhiliao.retrieval.service.SparseSearcher;
+import org.liar.zhiliao.vector.KbAwareEmbeddingStore;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Collection;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -38,7 +35,7 @@ import static org.mockito.Mockito.*;
 class KnowledgeRetrievalToolTest {
 
     @Mock EmbeddingModel embeddingModel;
-    @Mock EmbeddingStore<TextSegment> milvusEmbeddingStore;
+    @Mock KbAwareEmbeddingStore milvusEmbeddingStore;
     @Mock SparseSearcher sparseSearcher;
     @Mock Reranker reranker;
     @Mock ChunkRepository chunkRepository;
@@ -64,7 +61,7 @@ class KnowledgeRetrievalToolTest {
         when(retrievalCacheService.getCachedRetrieval(anyString(), anyString())).thenReturn(null);
         when(embeddingModel.embed(anyString()))
                 .thenReturn(Response.from(Embedding.from(new float[]{0.1f, 0.2f})));
-        when(milvusEmbeddingStore.search(any(EmbeddingSearchRequest.class)))
+        when(milvusEmbeddingStore.search(any(EmbeddingSearchRequest.class), any()))
                 .thenReturn(new EmbeddingSearchResult<>(List.of()));
         when(sparseSearcher.search(anyString(), anyInt(), any()))
                 .thenReturn(List.<SparseSearchResult>of());
@@ -105,14 +102,9 @@ class KnowledgeRetrievalToolTest {
 
         ArgumentCaptor<EmbeddingSearchRequest> req =
                 ArgumentCaptor.forClass(EmbeddingSearchRequest.class);
-        verify(milvusEmbeddingStore, atLeastOnce()).search(req.capture());
-        Filter filter = req.getValue().filter();
-        assertNotNull(filter);
-        assertInstanceOf(IsIn.class, filter);
-        // kbId metadata 为字符串形式；comparisonValues() 返回 Collection<?>，用 containsAll 断言避免实现类不匹配
-        Collection<?> values = ((IsIn) filter).comparisonValues();
-        assertEquals(2, values.size());
-        assertTrue(values.containsAll(List.of("1", "3")));
+        verify(milvusEmbeddingStore, atLeastOnce()).search(req.capture(), eq(List.of(1L, 3L)));
+        // 过滤改由 kbIds 参数承载，请求本身不再挂 metadata Filter
+        assertNull(req.getValue().filter());
         // 稀疏路按部门过滤
         verify(sparseSearcher, atLeastOnce()).search(anyString(), anyInt(), eq(List.of(2L)));
         // 缓存后缀为部门 ID
@@ -128,13 +120,24 @@ class KnowledgeRetrievalToolTest {
 
         tool.retrieveKnowledge("conv-a", "请假流程");
 
-        ArgumentCaptor<EmbeddingSearchRequest> req =
-                ArgumentCaptor.forClass(EmbeddingSearchRequest.class);
-        verify(milvusEmbeddingStore, atLeastOnce()).search(req.capture());
-        assertNull(req.getValue().filter());
+        verify(milvusEmbeddingStore, atLeastOnce())
+                .search(any(EmbeddingSearchRequest.class), isNull());
         verify(sparseSearcher, atLeastOnce()).search(anyString(), anyInt(), isNull());
         verify(retrievalCacheService, atLeastOnce())
                 .getCachedRetrieval(anyString(), eq("all"));
+    }
+
+    @Test
+    void singleVisibleKbPassesSingleElementList() {
+        stubHappyPath();
+        when(chunkRepository.findPrincipalByMemoryId("conv-1"))
+                .thenReturn(new RetrievalPrincipal(1L, "USER", 2L));
+        when(chunkRepository.findVisibleKbIds(2L)).thenReturn(List.of(7L));
+
+        tool.retrieveKnowledge("conv-1", "请假流程");
+
+        verify(milvusEmbeddingStore, atLeastOnce())
+                .search(any(EmbeddingSearchRequest.class), eq(List.of(7L)));
     }
 
     @Test
