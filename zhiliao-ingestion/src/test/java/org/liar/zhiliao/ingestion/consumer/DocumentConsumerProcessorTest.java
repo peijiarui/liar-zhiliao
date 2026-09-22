@@ -1,10 +1,10 @@
 package org.liar.zhiliao.ingestion.consumer;
 
+import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.Response;
-import dev.langchain4j.store.embedding.EmbeddingStore;
 import io.minio.GetObjectArgs;
 import io.minio.GetObjectResponse;
 import io.minio.MinioClient;
@@ -22,6 +22,7 @@ import org.liar.zhiliao.ingestion.model.DocumentMessage;
 import org.liar.zhiliao.ingestion.records.ParentChildSplitResult;
 import org.liar.zhiliao.ingestion.service.DocumentParser;
 import org.liar.zhiliao.ingestion.service.RecursiveDocumentSplitter;
+import org.liar.zhiliao.vector.KbAwareEmbeddingStore;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -48,7 +49,7 @@ class DocumentConsumerProcessorTest {
     @Mock ZlDocumentMapper documentMapper;
     @Mock ZlChunkMapper chunkMapper;
     @Mock EmbeddingModel embeddingModel;
-    @Mock EmbeddingStore<TextSegment> milvusEmbeddingStore;
+    @Mock KbAwareEmbeddingStore milvusEmbeddingStore;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock GetObjectResponse minioObject;
 
@@ -79,7 +80,7 @@ class DocumentConsumerProcessorTest {
         });
         when(embeddingModel.embedAll(anyList()))
                 .thenReturn(Response.from(List.of(Embedding.from(new float[]{0.1f}))));
-        when(milvusEmbeddingStore.addAll(anyList(), anyList())).thenReturn(List.of("v-new"));
+        when(milvusEmbeddingStore.addAll(anyList(), anyList(), anyLong())).thenReturn(List.of("v-new"));
     }
 
     private DocumentMessage message() {
@@ -102,7 +103,7 @@ class DocumentConsumerProcessorTest {
         verify(chunkMapper).delete(any());
         // 新数据仍写入：1 parent + 1 child insert，child 向量写 Milvus 并回填 embeddingId
         verify(chunkMapper, times(2)).insert(any(ZlChunk.class));
-        verify(milvusEmbeddingStore).addAll(anyList(), anyList());
+        verify(milvusEmbeddingStore).addAll(anyList(), anyList(), eq(1L));
         ArgumentCaptor<ZlChunk> updated = ArgumentCaptor.forClass(ZlChunk.class);
         verify(chunkMapper).updateById(updated.capture());
         assertEquals("v-new", updated.getValue().getEmbeddingId());
@@ -122,7 +123,25 @@ class DocumentConsumerProcessorTest {
         verify(milvusEmbeddingStore, never()).removeAll(anyCollection());
         verify(chunkMapper, never()).delete(any());
         verify(chunkMapper, times(2)).insert(any(ZlChunk.class));
-        verify(milvusEmbeddingStore).addAll(anyList(), anyList());
+        verify(milvusEmbeddingStore).addAll(anyList(), anyList(), eq(1L));
         assertEquals(DocumentStatusEnum.COMPLETED.getStatus(), doc.getStatus());
+    }
+
+    @Test
+    void processShouldPassKbIdSeparatelyAndKeepItOutOfMetadata() throws Exception {
+        stubHappyPath();
+        when(chunkMapper.selectList(any())).thenReturn(List.of());
+
+        processor.process(message());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<TextSegment>> segments = ArgumentCaptor.forClass(List.class);
+        verify(milvusEmbeddingStore).addAll(anyList(), segments.capture(), eq(1L));
+
+        Metadata metadata = segments.getValue().get(0).metadata();
+        // setUp 里 AtomicLong 从 100 起：parent 得到 101，child 得到 102
+        assertEquals("102", metadata.getString("chunkId"));
+        assertEquals("101", metadata.getString("parentId"));
+        assertNull(metadata.getString("kbId"));
     }
 }

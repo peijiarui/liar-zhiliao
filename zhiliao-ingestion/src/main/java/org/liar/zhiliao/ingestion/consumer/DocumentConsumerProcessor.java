@@ -5,7 +5,6 @@ import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
-import dev.langchain4j.store.embedding.EmbeddingStore;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +20,7 @@ import org.liar.zhiliao.ingestion.model.DocumentMessage;
 import org.liar.zhiliao.ingestion.records.ParentChildSplitResult;
 import org.liar.zhiliao.ingestion.service.DocumentParser;
 import org.liar.zhiliao.ingestion.service.RecursiveDocumentSplitter;
+import org.liar.zhiliao.vector.KbAwareEmbeddingStore;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -41,7 +41,7 @@ public class DocumentConsumerProcessor {
     private final ZlDocumentMapper documentMapper;
     private final ZlChunkMapper chunkMapper;
     private final EmbeddingModel embeddingModel;
-    private final EmbeddingStore<TextSegment> milvusEmbeddingStore;
+    private final KbAwareEmbeddingStore milvusEmbeddingStore;
     private final ApplicationEventPublisher eventPublisher;
 
     public void process(DocumentMessage message) {
@@ -113,7 +113,7 @@ public class DocumentConsumerProcessor {
                 childSegments.add(childSeg);
             }
 
-            // 7. 只对 child 做 Embedding 并写入 Milvus
+            // 7. 只对 child 做 Embedding 并写入 Milvus（kb_id 作为独立分区键字段）
             List<TextSegment> childSegmentsWithMeta = new ArrayList<>();
             for (int i = 0; i < childSegments.size(); i++) {
                 ZlChunk childEntity = childEntities.get(i);
@@ -121,13 +121,13 @@ public class DocumentConsumerProcessor {
                         childSegments.get(i).text(),
                         Metadata.from("chunkId", childEntity.getId().toString())
                                 .put("parentId", childEntity.getParentId() != null
-                                        ? childEntity.getParentId().toString() : "")
-                                .put("kbId", String.valueOf(doc.getKbId())));
+                                        ? childEntity.getParentId().toString() : ""));
                 childSegmentsWithMeta.add(segWithMeta);
             }
 
             List<Embedding> embeddings = embeddingModel.embedAll(childSegmentsWithMeta).content();
-            List<String> vectorIds = milvusEmbeddingStore.addAll(embeddings, childSegmentsWithMeta);
+            List<String> vectorIds = milvusEmbeddingStore.addAll(
+                    embeddings, childSegmentsWithMeta, doc.getKbId());
 
             for (int i = 0; i < childEntities.size(); i++) {
                 childEntities.get(i).setEmbeddingId(vectorIds.get(i));
