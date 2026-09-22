@@ -1,11 +1,15 @@
 package org.liar.zhiliao.vector;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import io.milvus.client.MilvusServiceClient;
+import io.milvus.common.clientenum.ConsistencyLevelEnum;
+import io.milvus.param.MetricType;
 import io.milvus.param.R;
 import io.milvus.param.dml.DeleteParam;
 import io.milvus.param.dml.InsertParam;
@@ -70,6 +74,8 @@ class MilvusKbEmbeddingStoreTest {
         assertEquals(10, param.getTopK());
         assertEquals("vector", param.getVectorFieldName());
         assertEquals(List.of("id", "text", "metadata"), param.getOutFields());
+        assertEquals(MetricType.COSINE.name(), param.getMetricType());
+        assertEquals(ConsistencyLevelEnum.EVENTUALLY, param.getConsistencyLevel());
     }
 
     // ---- 短路与防误用 ----
@@ -131,9 +137,12 @@ class MilvusKbEmbeddingStoreTest {
         assertEquals(List.of("文本"), fields.get("text"));
         assertEquals(ids, fields.get("id"));
 
-        String metadataJson = String.valueOf(((List<?>) fields.get("metadata")).get(0));
-        assertTrue(metadataJson.contains("chunkId"));
-        assertFalse(metadataJson.contains("kbId"));
+        // metadata 列忠实序列化调用方传入的 metadata：恰好 chunkId/parentId 两键，无其他键
+        JsonObject metadataColumn = JsonParser.parseString(
+                String.valueOf(((List<?>) fields.get("metadata")).get(0))).getAsJsonObject();
+        assertEquals(2, metadataColumn.size());
+        assertEquals("11", metadataColumn.get("chunkId").getAsString());
+        assertEquals("10", metadataColumn.get("parentId").getAsString());
     }
 
     // ---- 删除 ----

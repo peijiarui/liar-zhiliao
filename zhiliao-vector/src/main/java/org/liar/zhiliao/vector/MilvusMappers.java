@@ -22,9 +22,6 @@ import static com.google.gson.ToNumberPolicy.LONG_OR_DOUBLE;
  */
 final class MilvusMappers {
 
-    /** 分区键字段名 */
-    static final String KB_ID_FIELD = "kb_id";
-
     private static final Gson GSON = new GsonBuilder().setObjectToNumberStrategy(LONG_OR_DOUBLE).create();
     private static final Type MAP_TYPE = new TypeToken<Map<String, Object>>() {}.getType();
 
@@ -46,9 +43,9 @@ final class MilvusMappers {
             throw new IllegalArgumentException("kbIds must not be empty; caller must short-circuit");
         }
         if (kbIds.size() == 1) {
-            return KB_ID_FIELD + " == " + kbIds.get(0);
+            return MilvusSchema.KB_ID_FIELD + " == " + kbIds.get(0);
         }
-        return KB_ID_FIELD + " in ["
+        return MilvusSchema.KB_ID_FIELD + " in ["
                 + kbIds.stream().map(String::valueOf).collect(Collectors.joining(",")) + "]";
     }
 

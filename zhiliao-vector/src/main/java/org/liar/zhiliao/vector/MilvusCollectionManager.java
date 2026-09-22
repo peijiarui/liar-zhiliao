@@ -28,11 +28,6 @@ import java.util.List;
 @Slf4j
 class MilvusCollectionManager {
 
-    static final String ID_FIELD = "id";
-    static final String TEXT_FIELD = "text";
-    static final String METADATA_FIELD = "metadata";
-    static final String VECTOR_FIELD = "vector";
-
     private static final int ID_MAX_LENGTH = 36;
     private static final int TEXT_MAX_LENGTH = 65535;
     private static final String ISOLATION_PROPERTY = "partitionkey.isolation";
@@ -57,9 +52,9 @@ class MilvusCollectionManager {
             createCollection();
             createVectorIndex();
             log.info("Milvus collection {} created: dimension={}, numPartitions={}, vectorIndex=HNSW/COSINE, partitionKey={}",
-                    collectionName, dimension, numPartitions, MilvusMappers.KB_ID_FIELD);
+                    collectionName, dimension, numPartitions, MilvusSchema.KB_ID_FIELD);
         }
-        check(client.loadCollection(LoadCollectionParam.newBuilder()
+        MilvusResponses.check(client.loadCollection(LoadCollectionParam.newBuilder()
                 .withCollectionName(collectionName).build()), "loadCollection");
     }
 
@@ -68,21 +63,21 @@ class MilvusCollectionManager {
      */
     static void validateSchema(List<FieldType> fields, int expectedDimension, String collectionName) {
         FieldType kbField = fields.stream()
-                .filter(field -> MilvusMappers.KB_ID_FIELD.equals(field.getName()))
+                .filter(field -> MilvusSchema.KB_ID_FIELD.equals(field.getName()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
-                        mismatch(collectionName, "missing field '" + MilvusMappers.KB_ID_FIELD + "'")));
+                        mismatch(collectionName, "missing field '" + MilvusSchema.KB_ID_FIELD + "'")));
 
         if (!kbField.isPartitionKey()) {
             throw new IllegalStateException(
-                    mismatch(collectionName, "field '" + MilvusMappers.KB_ID_FIELD + "' is not a partition key"));
+                    mismatch(collectionName, "field '" + MilvusSchema.KB_ID_FIELD + "' is not a partition key"));
         }
 
         FieldType vectorField = fields.stream()
-                .filter(field -> VECTOR_FIELD.equals(field.getName()))
+                .filter(field -> MilvusSchema.VECTOR_FIELD.equals(field.getName()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
-                        mismatch(collectionName, "missing field '" + VECTOR_FIELD + "'")));
+                        mismatch(collectionName, "missing field '" + MilvusSchema.VECTOR_FIELD + "'")));
 
         if (vectorField.getDimension() != expectedDimension) {
             throw new IllegalStateException(mismatch(collectionName,
@@ -98,7 +93,7 @@ class MilvusCollectionManager {
     private boolean hasCollection() {
         R<Boolean> response = client.hasCollection(HasCollectionParam.newBuilder()
                 .withCollectionName(collectionName).build());
-        check(response, "hasCollection");
+        MilvusResponses.check(response, "hasCollection");
         return Boolean.TRUE.equals(response.getData());
     }
 
@@ -107,31 +102,31 @@ class MilvusCollectionManager {
                 .withCollectionName(collectionName)
                 .withSchema(CollectionSchemaParam.newBuilder()
                         .addFieldType(FieldType.newBuilder()
-                                .withName(ID_FIELD).withDataType(DataType.VarChar)
+                                .withName(MilvusSchema.ID_FIELD).withDataType(DataType.VarChar)
                                 .withMaxLength(ID_MAX_LENGTH)
                                 .withPrimaryKey(true).withAutoID(false).build())
                         .addFieldType(FieldType.newBuilder()
-                                .withName(TEXT_FIELD).withDataType(DataType.VarChar)
+                                .withName(MilvusSchema.TEXT_FIELD).withDataType(DataType.VarChar)
                                 .withMaxLength(TEXT_MAX_LENGTH).build())
                         .addFieldType(FieldType.newBuilder()
-                                .withName(METADATA_FIELD).withDataType(DataType.JSON).build())
+                                .withName(MilvusSchema.METADATA_FIELD).withDataType(DataType.JSON).build())
                         .addFieldType(FieldType.newBuilder()
-                                .withName(VECTOR_FIELD).withDataType(DataType.FloatVector)
+                                .withName(MilvusSchema.VECTOR_FIELD).withDataType(DataType.FloatVector)
                                 .withDimension(dimension).build())
                         .addFieldType(FieldType.newBuilder()
-                                .withName(MilvusMappers.KB_ID_FIELD).withDataType(DataType.Int64)
+                                .withName(MilvusSchema.KB_ID_FIELD).withDataType(DataType.Int64)
                                 .withPartitionKey(true).build())
                         .build())
                 .withPartitionsNum(numPartitions)
                 .withProperty(ISOLATION_PROPERTY, "true")
                 .build();
-        check(client.createCollection(request), "createCollection");
+        MilvusResponses.check(client.createCollection(request), "createCollection");
     }
 
     private void createVectorIndex() {
-        check(client.createIndex(CreateIndexParam.newBuilder()
+        MilvusResponses.check(client.createIndex(CreateIndexParam.newBuilder()
                 .withCollectionName(collectionName)
-                .withFieldName(VECTOR_FIELD)
+                .withFieldName(MilvusSchema.VECTOR_FIELD)
                 .withIndexType(IndexType.HNSW)
                 .withMetricType(MetricType.COSINE)
                 .withExtraParam(HNSW_EXTRA_PARAM)
@@ -141,11 +136,11 @@ class MilvusCollectionManager {
     private void validateExisting() {
         R<DescribeCollectionResponse> response = client.describeCollection(DescribeCollectionParam.newBuilder()
                 .withCollectionName(collectionName).build());
-        check(response, "describeCollection");
+        MilvusResponses.check(response, "describeCollection");
         validateSchema(new DescCollResponseWrapper(response.getData()).getFields(), dimension, collectionName);
 
         if (isVectorIndexMissing()) {
-            log.warn("Milvus collection {} has no index on {}; creating", collectionName, VECTOR_FIELD);
+            log.warn("Milvus collection {} has no index on {}; creating", collectionName, MilvusSchema.VECTOR_FIELD);
             createVectorIndex();
         }
     }
@@ -157,16 +152,6 @@ class MilvusCollectionManager {
             return true;
         }
         return new DescIndexResponseWrapper(response.getData())
-                .getIndexDescByFieldName(VECTOR_FIELD) == null;
-    }
-
-    private static void check(R<?> response, String operation) {
-        if (response == null) {
-            throw new IllegalStateException("Milvus " + operation + " failed: null response");
-        }
-        if (response.getStatus() != R.Status.Success.getCode()) {
-            throw new IllegalStateException(
-                    "Milvus " + operation + " failed: status=" + response.getStatus(), response.getException());
-        }
+                .getIndexDescByFieldName(MilvusSchema.VECTOR_FIELD) == null;
     }
 }

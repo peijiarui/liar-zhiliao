@@ -29,11 +29,6 @@ import java.util.stream.Collectors;
  */
 public class MilvusKbEmbeddingStore implements KbAwareEmbeddingStore {
 
-    private static final String ID_FIELD = "id";
-    private static final String TEXT_FIELD = "text";
-    private static final String METADATA_FIELD = "metadata";
-    private static final String VECTOR_FIELD = "vector";
-
     static final String KB_ID_REQUIRED_MESSAGE =
             "kbId required: use addAll(embeddings, segments, kbId)";
 
@@ -56,15 +51,15 @@ public class MilvusKbEmbeddingStore implements KbAwareEmbeddingStore {
         }
 
         List<InsertParam.Field> fields = List.of(
-                new InsertParam.Field(ID_FIELD, ids),
-                new InsertParam.Field(TEXT_FIELD, texts(segments, embeddings.size())),
-                new InsertParam.Field(METADATA_FIELD, metadataJsons(segments, embeddings.size())),
-                new InsertParam.Field(VECTOR_FIELD,
+                new InsertParam.Field(MilvusSchema.ID_FIELD, ids),
+                new InsertParam.Field(MilvusSchema.TEXT_FIELD, texts(segments, embeddings.size())),
+                new InsertParam.Field(MilvusSchema.METADATA_FIELD, metadataJsons(segments, embeddings.size())),
+                new InsertParam.Field(MilvusSchema.VECTOR_FIELD,
                         embeddings.stream().map(Embedding::vectorAsList).toList()),
-                new InsertParam.Field(MilvusMappers.KB_ID_FIELD,
+                new InsertParam.Field(MilvusSchema.KB_ID_FIELD,
                         Collections.nCopies(embeddings.size(), kbId)));
 
-        check(client.insert(InsertParam.newBuilder()
+        MilvusResponses.check(client.insert(InsertParam.newBuilder()
                 .withCollectionName(collectionName)
                 .withFields(fields)
                 .build()), "insert");
@@ -77,11 +72,11 @@ public class MilvusKbEmbeddingStore implements KbAwareEmbeddingStore {
         if (ids == null || ids.isEmpty()) {
             return;
         }
-        String expr = ID_FIELD + " in [" + ids.stream()
+        String expr = MilvusSchema.ID_FIELD + " in [" + ids.stream()
                 .map(id -> "\"" + id + "\"")
                 .collect(Collectors.joining(",")) + "]";
 
-        check(client.delete(DeleteParam.newBuilder()
+        MilvusResponses.check(client.delete(DeleteParam.newBuilder()
                 .withCollectionName(collectionName)
                 .withExpr(expr)
                 .build()), "delete");
@@ -103,7 +98,7 @@ public class MilvusKbEmbeddingStore implements KbAwareEmbeddingStore {
         }
 
         R<SearchResults> response = client.search(buildSearchParam(request, kbIds));
-        check(response, "search");
+        MilvusResponses.check(response, "search");
 
         SearchResultsWrapper wrapper = new SearchResultsWrapper(response.getData().getResults());
         return new EmbeddingSearchResult<>(
@@ -115,11 +110,12 @@ public class MilvusKbEmbeddingStore implements KbAwareEmbeddingStore {
         SearchParam.Builder builder = SearchParam.newBuilder()
                 .withCollectionName(collectionName)
                 .withFloatVectors(List.of(request.queryEmbedding().vectorAsList()))
-                .withVectorFieldName(VECTOR_FIELD)
+                .withVectorFieldName(MilvusSchema.VECTOR_FIELD)
                 .withTopK(request.maxResults())
                 .withMetricType(MetricType.COSINE)
                 .withConsistencyLevel(ConsistencyLevelEnum.EVENTUALLY)
-                .withOutFields(List.of(ID_FIELD, TEXT_FIELD, METADATA_FIELD));
+                .withOutFields(List.of(MilvusSchema.ID_FIELD, MilvusSchema.TEXT_FIELD,
+                        MilvusSchema.METADATA_FIELD));
 
         String expr = MilvusMappers.buildKbExpr(kbIds);
         if (expr != null) {
@@ -139,8 +135,8 @@ public class MilvusKbEmbeddingStore implements KbAwareEmbeddingStore {
         var idScores = wrapper.getIDScore(0);
         List<MilvusMappers.RawHit> hits = new ArrayList<>(rows.size());
         for (int i = 0; i < rows.size(); i++) {
-            Object textField = rows.get(i).get(TEXT_FIELD);
-            Object metadataField = rows.get(i).get(METADATA_FIELD);
+            Object textField = rows.get(i).get(MilvusSchema.TEXT_FIELD);
+            Object metadataField = rows.get(i).get(MilvusSchema.METADATA_FIELD);
             Map<String, Object> metadata = metadataField instanceof JsonObject json
                     ? MilvusMappers.parseMetadata(json)
                     : Map.of();
@@ -192,16 +188,5 @@ public class MilvusKbEmbeddingStore implements KbAwareEmbeddingStore {
     @Override
     public void addAll(List<String> ids, List<Embedding> embeddings, List<TextSegment> segments) {
         throw new UnsupportedOperationException(KB_ID_REQUIRED_MESSAGE);
-    }
-
-    private static void check(R<?> response, String operation) {
-        if (response == null) {
-            throw new IllegalStateException("Milvus " + operation + " failed: null response");
-        }
-        if (response.getStatus() != R.Status.Success.getCode()) {
-            throw new IllegalStateException(
-                    "Milvus " + operation + " failed: status=" + response.getStatus(),
-                    response.getException());
-        }
     }
 }
