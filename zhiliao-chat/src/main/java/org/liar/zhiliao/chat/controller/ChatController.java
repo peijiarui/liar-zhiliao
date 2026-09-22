@@ -77,7 +77,7 @@ public class ChatController {
         } else if (e instanceof AuthorityException) {
             return Flux.just("当前用户无访问权限。");
         } else if (e instanceof DegradeException) {
-            return fallbackToDocs(message);
+            return fallbackToDocs(memoryId, message);
         }
         return Flux.just("请求被限流，请稍后重试。");
     }
@@ -96,16 +96,17 @@ public class ChatController {
             return Flux.just("输入被拒绝：" + rejection);
         }
 
-        return fallbackToDocs(message);
+        return fallbackToDocs(memoryId, message);
     }
 
     /**
      * 熔断降级核心逻辑：从知识库检索文档片段返回。
+     * 传入 memoryId 使降级检索同样按会话身份做权限过滤（无会话时 fail-closed 返回空）。
      */
-    private Flux<String> fallbackToDocs(String message) {
+    private Flux<String> fallbackToDocs(String memoryId, String message) {
         // 直接从知识库检索文档片段
         try {
-            String docs = knowledgeRetrievalTool.retrieveKnowledge(message);
+            String docs = knowledgeRetrievalTool.retrieveKnowledge(memoryId, message);
             if (docs != null && !docs.isEmpty()) {
                 return Flux.just("AI 服务暂时繁忙，以下是从知识库找到的相关内容供参考：\n\n" + docs);
             }

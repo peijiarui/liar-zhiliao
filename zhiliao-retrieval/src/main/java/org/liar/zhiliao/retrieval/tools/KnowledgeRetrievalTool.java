@@ -6,16 +6,17 @@ import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import dev.langchain4j.store.embedding.EmbeddingStore;
+import dev.langchain4j.store.embedding.filter.Filter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.liar.zhiliao.common.model.CurrentUser;
-import org.liar.zhiliao.common.utils.UserContextHolder;
 import org.liar.zhiliao.retrieval.repository.ChunkRepository;
 import org.liar.zhiliao.retrieval.records.RankedChunk;
+import org.liar.zhiliao.retrieval.records.RetrievalPrincipal;
 import org.liar.zhiliao.retrieval.service.Reranker;
 import org.liar.zhiliao.retrieval.records.SparseSearchResult;
 import org.liar.zhiliao.retrieval.service.RetrievalCacheService;
@@ -24,6 +25,8 @@ import org.liar.zhiliao.retrieval.service.SparseSearcher;
 import org.springframework.stereotype.Component;
 
 import io.micrometer.core.instrument.Timer;
+
+import static dev.langchain4j.store.embedding.filter.MetadataFilterBuilder.metadataKey;
 
 import java.util.*;
 import java.nio.charset.StandardCharsets;
@@ -49,7 +52,26 @@ public class KnowledgeRetrievalTool {
     private final RetrievalMetrics retrievalMetrics;
 
     @Tool("检索企业知识库：查找公司制度、政策、流程、产品信息等企业内部知识。仅当用户明确询问企业内部知识时调用，日常闲聊无需调用")
-    public String retrieveKnowledge(@P("查询内容") String query) {
+    public String retrieveKnowledge(@MemoryId String memoryId, @P("查询内容") String query) {
+        // Step -1: 会话身份解析（替代 ThreadLocal，流式工具线程不可靠）
+        RetrievalPrincipal principal = chunkRepository.findPrincipalByMemoryId(memoryId);
+        if (principal == null) {
+            log.warn("No session principal for memoryId={}, deny retrieval", memoryId);
+            return "";
+        }
+        boolean admin = principal.isAdmin();
+        List<Long> visibleKbIds = admin
+                ? List.of()
+                : chunkRepository.findVisibleKbIds(principal.deptId());
+        if (!admin && visibleKbIds.isEmpty()) {
+            log.info("User {} has no visible knowledge bases, return empty", principal.userId());
+            return "";
+        }
+        // Milvus metadata 的 kbId 为字符串形式
+        Filter kbFilter = admin
+                ? null
+                : metadataKey("kbId").isIn(visibleKbIds.stream().map(String::valueOf).toList());
+
         // Step 0: 查询规范化
         String normalized = normalize(query);
 
@@ -64,7 +86,7 @@ public class KnowledgeRetrievalTool {
         }
 
         // Step 1: 部门后缀（用于缓存 key 权限隔离）
-        String deptSuffix = extractDeptSuffix();
+        String deptSuffix = admin ? "all" : String.valueOf(principal.deptId());
 
         // Step 2: 尝试从 rewrite 缓存获取改写结果
         List<String> subQueries;
@@ -112,11 +134,14 @@ public class KnowledgeRetrievalTool {
             // 4a: Milvus 稠密检索（计时）
             log.debug("======== 调用向量模型获取向量 ========");
             Embedding queryEmbedding = embeddingModel.embed(subQuery).content();
-            EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
+            var requestBuilder = EmbeddingSearchRequest.builder()
                     .queryEmbedding(queryEmbedding)
                     .maxResults(10)
-                    .minScore(0.7)
-                    .build();
+                    .minScore(0.7);
+            if (kbFilter != null) {
+                requestBuilder.filter(kbFilter);
+            }
+            EmbeddingSearchRequest request = requestBuilder.build();
             log.debug("======== 稠密检索：调用向量数据库进行相似度匹配 ========");
             Timer.Sample denseSample = retrievalMetrics.startTimer();   // 稠密检索耗时统计埋点
             try {
@@ -128,10 +153,8 @@ public class KnowledgeRetrievalTool {
             }
 
             // 4b: PG BM25 稀疏检索（计时）
-            CurrentUser currentUser = UserContextHolder.get();
-            List<Long> visibleDeptIds = currentUser != null
-                    ? currentUser.visibleDeptIds()
-                    : List.of(1L);
+            // admin 传 null 表示不过滤；普通用户按自身部门过滤
+            List<Long> visibleDeptIds = admin ? null : List.of(principal.deptId());
             log.debug("======== 稀疏检索：调用PG进行关键词匹配 ========");
             Timer.Sample sparseSample = retrievalMetrics.startTimer();  // 稀疏检索耗时统计埋点
             try {
@@ -158,25 +181,6 @@ public class KnowledgeRetrievalTool {
 
         // Step 8: 父子文档替换 + 构建上下文
         return buildContextFromRanked(ranked);
-    }
-
-    /**
-     * 从当前用户上下文中提取部门 ID 后缀。
-     */
-    private String extractDeptSuffix() {
-        CurrentUser currentUser = UserContextHolder.get();
-        List<Long> deptIds = currentUser != null
-                ? currentUser.visibleDeptIds()
-                : List.of(1L);
-        // 排序保证相同部门集合产生相同的缓存 key 后缀
-        List<Long> sorted = new ArrayList<>(deptIds);
-        sorted.sort(Long::compareTo);
-        if (sorted.isEmpty()) {
-            sorted = new ArrayList<>(List.of(1L));
-        }
-        return sorted.stream()
-                .map(String::valueOf)
-                .collect(java.util.stream.Collectors.joining("_"));
     }
 
     /**
