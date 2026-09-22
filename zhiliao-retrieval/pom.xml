@@ -32,10 +32,16 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- milvus 向量数据库相关依赖 -->
+        <!-- milvus 向量存储（自研，kb_id 分区键）；版本由根 pom dependencyManagement 管理 -->
+        <dependency>
+            <groupId>org.liar.ai</groupId>
+            <artifactId>zhiliao-vector</artifactId>
+        </dependency>
+
+        <!-- 直接使用 TextSegment / EmbeddingStore / ToolMemoryId 等核心类型 -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-milvus-spring-boot-starter</artifactId>
+            <artifactId>langchain4j-core</artifactId>
         </dependency>
 
         <!-- Micrometer 指标采集 -->

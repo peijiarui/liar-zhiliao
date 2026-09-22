@@ -64,13 +64,6 @@ langchain4j:
       max-segments-per-batch: 10
       log-requests: true
       log-responses: false
-  milvus:
-    host: ${RESOURCE_SERVER_HOST}
-    port: 19530
-    collection-name: zhiliao_chunks
-    username: peijiarui
-    password: ${RESOURCE_SERVER_PASSWORD}
-#    dimension: 1024
 #  community:
 #    redis:
 #      host: ${RESOURCE_SERVER_HOST}
@@ -99,6 +92,14 @@ zhiliao:
     bucket: zhiliao-docs
   rabbitmq:
     queue: zhiliao.document.process
+  milvus:
+    host: ${RESOURCE_SERVER_HOST}
+    port: 19530
+    collection-name: zhiliao_chunks
+    username: peijiarui
+    password: ${RESOURCE_SERVER_PASSWORD}
+    num-partitions: 64
+    # dimension: 1024   # 缺省取 EmbeddingModel.dimension()
   auth:
     app-id: zhiliao                         # SSO 应用标识，预留多应用
     access-token-ttl-seconds: 900           # 15 min

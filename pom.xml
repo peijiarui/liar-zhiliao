@@ -46,6 +46,11 @@
             </dependency>
             <dependency>
                 <groupId>org.liar.ai</groupId>
+                <artifactId>zhiliao-vector</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.liar.ai</groupId>
                 <artifactId>zhiliao-ingestion</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -123,17 +128,11 @@
                 <version>1.17.0</version>
             </dependency>
 
-            <!-- Milvus 官方 SDK：自研 zhiliao-vector 直接使用，不再经 langchain4j-milvus -->
+            <!-- Milvus 官方 SDK：自研 zhiliao-vector 直接使用，不再经第三方 starter -->
             <dependency>
                 <groupId>io.milvus</groupId>
                 <artifactId>milvus-sdk-java</artifactId>
                 <version>2.5.9</version>
-            </dependency>
-
-            <dependency>
-                <groupId>dev.langchain4j</groupId>
-                <artifactId>langchain4j-milvus-spring-boot-starter</artifactId>
-                <version>${langchain4j.version}</version>
             </dependency>
 
             <!-- Apache Tika -->
@@ -177,7 +176,7 @@
             </dependency>
 
             <!-- ========以下指定依赖版本，解决漏洞，这样pom中就不会有报警告的依赖了======== -->
-            <!-- 修复CVE-2025-55163 Netty DDoS漏洞 【langchain4j-milvus-spring-boot-starter】中引用 -->
+            <!-- 修复CVE-2025-55163 Netty DDoS漏洞 【milvus-sdk-java】间接引用 grpc-netty-shaded -->
             <dependency>
                 <groupId>io.grpc</groupId>
                 <artifactId>grpc-netty-shaded</artifactId>

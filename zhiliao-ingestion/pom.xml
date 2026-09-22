@@ -29,10 +29,10 @@
             <version>1.17.0</version>
         </dependency>
 
-        <!-- milvus 向量数据库客户端 -->
+        <!-- milvus 向量存储（自研，kb_id 分区键）；版本由根 pom dependencyManagement 管理 -->
         <dependency>
-            <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-milvus-spring-boot-starter</artifactId>
+            <groupId>org.liar.ai</groupId>
+            <artifactId>zhiliao-vector</artifactId>
         </dependency>
 
         <!-- Spring Boot Web -->
