@@ -14,7 +14,11 @@ public class PgBm25Searcher implements SparseSearcher {
 
     @Override
     public List<SparseSearchResult> search(String query, int topK, List<Long> visibleDeptIds) {
-        if (visibleDeptIds == null || visibleDeptIds.isEmpty()) {
+        if (visibleDeptIds == null) {
+            // admin：不做部门过滤
+            return chunkRepository.searchBm25(query, topK);
+        }
+        if (visibleDeptIds.isEmpty()) {
             return List.of();
         }
         return chunkRepository.searchBm25WithDeptFilter(query, topK, visibleDeptIds);
