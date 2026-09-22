@@ -18,6 +18,7 @@
 
     <modules>
         <module>zhiliao-common</module>
+        <module>zhiliao-vector</module>
         <module>zhiliao-ingestion</module>
         <module>zhiliao-retrieval</module>
         <module>zhiliao-chat</module>
@@ -114,6 +115,19 @@
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j</artifactId>
                 <version>1.17.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-core</artifactId>
+                <version>1.17.0</version>
+            </dependency>
+
+            <!-- Milvus 官方 SDK：自研 zhiliao-vector 直接使用，不再经 langchain4j-milvus -->
+            <dependency>
+                <groupId>io.milvus</groupId>
+                <artifactId>milvus-sdk-java</artifactId>
+                <version>2.5.9</version>
             </dependency>
 
             <dependency>
