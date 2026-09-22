@@ -116,7 +116,8 @@ public class DocumentConsumerProcessor {
                         childSegments.get(i).text(),
                         Metadata.from("chunkId", childEntity.getId().toString())
                                 .put("parentId", childEntity.getParentId() != null
-                                        ? childEntity.getParentId().toString() : ""));
+                                        ? childEntity.getParentId().toString() : "")
+                                .put("kbId", String.valueOf(doc.getKbId())));
                 childSegmentsWithMeta.add(segWithMeta);
             }
 
