@@ -175,7 +175,7 @@ public class DocumentServiceImpl implements DocumentService {
                     .object(doc.getMinioKey())
                     .build());
         } catch (Exception e) {
-            log.warn("MinIO object delete ignored: key={}, err={}", doc.getMinioKey(), e.getMessage());
+            log.warn("MinIO object delete ignored: key={}", doc.getMinioKey(), e);
         }
 
         // 4. 发布文档更新事件 → 全量淘汰检索缓存

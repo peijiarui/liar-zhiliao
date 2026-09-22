@@ -107,7 +107,9 @@
                 <artifactId>langchain4j-easy-rag</artifactId>
                 <version>${langchain4j.version}</version>
             </dependency>
-            <!-- 主 jar 只随稳定版本发布（1.17.0-beta27 不存在），beta 系模块本身即依赖 1.17.0 -->
+            <!-- 主 jar 供 chat 模块 AiService 层使用（@MemoryId/@SystemMessage 等 service 注解仅在主 jar，core 中没有）；
+                 检索模块已改用 core 中的 @ToolMemoryId，不再直接依赖主 jar。
+                 主 jar 只随稳定版本发布（1.17.0-beta27 不存在），beta 系模块本身即依赖 1.17.0 -->
             <dependency>
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j</artifactId>
