@@ -7,10 +7,13 @@ import com.alibaba.csp.sentinel.slots.block.degrade.DegradeException;
 import com.alibaba.csp.sentinel.slots.block.flow.FlowException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.liar.zhiliao.chat.entity.Conversation;
 import org.liar.zhiliao.chat.security.InputFilter;
 import org.liar.zhiliao.chat.service.ChatService;
 import org.liar.zhiliao.chat.service.ConversationService;
 import org.liar.zhiliao.chat.service.TitleGenerationService;
+import org.liar.zhiliao.common.model.CurrentUser;
+import org.liar.zhiliao.common.utils.UserContextHolder;
 import org.liar.zhiliao.retrieval.tools.KnowledgeRetrievalTool;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -54,6 +57,20 @@ public class ChatController {
         }
 
         final String finalMessage = message;
+
+        // 会话所有权校验：检索身份由 memoryId 解析，非本人且非 ADMIN 拒绝，
+        // 防止冒用他人 memoryId 以其身份检索并加载其聊天记忆。
+        // 注意：此处不能抛 BusinessException —— @SentinelResource 的 fallback 会捕获它
+        // 并走 fallbackToDocs，用未校验的 memoryId 检索，反而保留冒用路径；
+        // 以本控制器既有的 Flux 文本拒绝模式（同输入过滤）直接返回。
+        CurrentUser user = UserContextHolder.get();
+        Conversation conversation = conversationService.getByMemoryId(memoryId);
+        if (conversation != null
+                && !isOwnerOrAdmin(user, conversation.getUserId())) {
+            log.warn("Conversation ownership denied: memoryId={}, userId={}, ownerId={}",
+                    memoryId, user == null ? null : user.id(), conversation.getUserId());
+            return Flux.just("无权访问该会话，或会话不存在。");
+        }
 
         conversationService.touchConversation(memoryId);
 
@@ -118,6 +135,17 @@ public class ChatController {
 
     private static String truncate(String s, int maxLen) {
         return s != null && s.length() > maxLen ? s.substring(0, maxLen) + "..." : s;
+    }
+
+    /**
+     * 会话归属判定：当前用户是会话本人，或角色为 ADMIN（管理员调试，与检索侧 admin 全量语义一致）。
+     * user 为空时 fail-closed 拒绝。
+     */
+    private static boolean isOwnerOrAdmin(CurrentUser user, Long ownerId) {
+        if (user == null) {
+            return false;
+        }
+        return ownerId.equals(user.id()) || "ADMIN".equals(user.role());
     }
 
 }
