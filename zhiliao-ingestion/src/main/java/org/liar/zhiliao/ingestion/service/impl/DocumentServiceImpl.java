@@ -8,15 +8,19 @@ import io.minio.PutObjectArgs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.liar.zhiliao.common.exception.BusinessException;
 import org.liar.zhiliao.common.mapper.ZlKbDeptVisibilityMapper;
 import org.liar.zhiliao.ingestion.config.MinIOConfig;
 import org.liar.zhiliao.ingestion.config.RabbitMQConfig;
 import org.liar.zhiliao.ingestion.entity.ZlDocument;
+import org.liar.zhiliao.ingestion.mapper.ZlChunkMapper;
 import org.liar.zhiliao.ingestion.mapper.ZlDocumentMapper;
 import org.liar.zhiliao.ingestion.model.DocumentMessage;
 import org.liar.zhiliao.ingestion.service.DocumentService;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -42,9 +46,21 @@ public class DocumentServiceImpl implements DocumentService {
     private final ZlDocumentMapper documentMapper;
     private final ZlKbDeptVisibilityMapper visibilityMapper;
     private final RabbitTemplate rabbitTemplate;
+    private final ZlChunkMapper chunkMapper;
+    private final JdbcTemplate jdbcTemplate;
+    private final TransactionTemplate transactionTemplate;
 
     @Override
     public ZlDocument upload(MultipartFile file, Long kbId) {
+        if (kbId == null) {
+            throw new BusinessException(400, "kbId 不能为空");
+        }
+        Long kbCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM zl_knowledge_base WHERE id = ?", Long.class, kbId);
+        if (kbCount == null || kbCount == 0) {
+            throw new BusinessException(400, "知识库不存在: " + kbId);
+        }
+
         // 1. Compute MD5
         String fileMd5;
         try {
