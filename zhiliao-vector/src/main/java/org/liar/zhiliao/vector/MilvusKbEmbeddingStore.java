@@ -129,8 +129,9 @@ public class MilvusKbEmbeddingStore implements KbAwareEmbeddingStore {
     }
 
     private static List<MilvusMappers.RawHit> toRawHits(SearchResultsWrapper wrapper) {
-        // RowRecord 实际类型是 QueryResultsWrapper.RowRecord，用 var 避免额外导入
-        var rows = wrapper.getRowRecords();
+        // RowRecord 实际类型是 QueryResultsWrapper.RowRecord，用 var 避免额外导入。
+        // 用带参重载 getRowRecords(0)：无参重载已 @Deprecated（内部即委托 0），带参形式与之等价且无编译告警。
+        var rows = wrapper.getRowRecords(0);
         if (rows.isEmpty()) {
             return List.of();
         }
