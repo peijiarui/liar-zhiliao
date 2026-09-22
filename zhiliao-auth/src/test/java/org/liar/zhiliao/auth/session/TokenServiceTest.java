@@ -38,7 +38,7 @@ class TokenServiceTest {
 
     @Test
     void issue_Token_shouldStoreBothTokensAndReturnPair() {
-        CurrentUser user = new CurrentUser(1L, "alice", "Alice", 2L, List.of(1L, 2L));
+        CurrentUser user = new CurrentUser(1L, "alice", "Alice", "USER", 2L, List.of(1L, 2L));
 
         TokenPair pair = tokenService.issueToken(user);
 
@@ -62,7 +62,7 @@ class TokenServiceTest {
     void refresh_shouldRotateRefreshToken() throws Exception {
         // 准备一个已存在的 refresh token
         RefreshTokenData existing = new RefreshTokenData(
-                "old-rt-id", 1L, "alice", "Alice", 2L, List.of(1L, 2L),
+                "old-rt-id", 1L, "alice", "Alice", "USER", 2L, List.of(1L, 2L),
                 System.currentTimeMillis(), System.currentTimeMillis() + 86400000L, false);
         when(valueOps.get(contains("auth:refresh:zhiliao:")))
                 .thenReturn(new ObjectMapper().writeValueAsString(existing));
@@ -76,7 +76,7 @@ class TokenServiceTest {
     @Test
     void refresh_shouldThrowWhenTokenRotated() throws Exception {
         RefreshTokenData rotated = new RefreshTokenData(
-                "rt-id", 1L, "alice", "Alice", 2L, List.of(1L, 2L),
+                "rt-id", 1L, "alice", "Alice", "USER", 2L, List.of(1L, 2L),
                 System.currentTimeMillis(), System.currentTimeMillis() + 86400000L, true);
         when(valueOps.get(contains("auth:refresh:zhiliao:")))
                 .thenReturn(new ObjectMapper().writeValueAsString(rotated));
