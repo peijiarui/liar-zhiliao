@@ -84,15 +84,15 @@ public class MilvusKbEmbeddingStore implements KbAwareEmbeddingStore {
 
     @Override
     public EmbeddingSearchResult<TextSegment> search(EmbeddingSearchRequest request) {
-        if (request.filter() != null) {
-            throw new UnsupportedOperationException(
-                    "metadata Filter is not supported by this store: use search(request, kbIds)");
-        }
         return search(request, null);
     }
 
     @Override
     public EmbeddingSearchResult<TextSegment> search(EmbeddingSearchRequest request, List<Long> kbIds) {
+        if (request.filter() != null) {
+            throw new UnsupportedOperationException(
+                    "metadata Filter is not supported by this store: use the search(request, kbIds) kb-scoped API");
+        }
         if (kbIds != null && kbIds.isEmpty()) {
             return new EmbeddingSearchResult<>(List.of());
         }

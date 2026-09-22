@@ -98,6 +98,8 @@ class MilvusKbEmbeddingStoreTest {
                 .build();
 
         assertThrows(UnsupportedOperationException.class, () -> store.search(withFilter));
+        // 生产入口是两参重载：守卫收敛到它，同样必须拒绝被静默忽略的 metadata filter
+        assertThrows(UnsupportedOperationException.class, () -> store.search(withFilter, List.of(1L)));
         verifyNoInteractions(client);
     }
 
