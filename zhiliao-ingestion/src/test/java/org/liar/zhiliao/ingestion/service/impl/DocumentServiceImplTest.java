@@ -210,4 +210,11 @@ class DocumentServiceImplTest {
         assertDoesNotThrow(() -> service.reprocess(99L));
         verifyNoInteractions(rabbitTemplate);
     }
+
+    @Test
+    void getDocumentShouldThrow404WhenMissing() {
+        when(documentMapper.selectById(404L)).thenReturn(null);
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.getDocument(404L));
+        assertEquals(404, ex.getStatus());
+    }
 }

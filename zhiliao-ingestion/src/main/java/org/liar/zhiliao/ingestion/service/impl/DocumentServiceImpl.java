@@ -136,7 +136,11 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     public ZlDocument getDocument(Long id) {
-        return documentMapper.selectById(id);
+        ZlDocument doc = documentMapper.selectById(id);
+        if (doc == null) {
+            throw new BusinessException(404, "文档不存在: " + id);
+        }
+        return doc;
     }
 
     @Override
