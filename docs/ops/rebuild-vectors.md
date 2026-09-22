@@ -10,16 +10,18 @@
    ```bash
    docker exec -it zhiliao-postgres psql -U <user> -d zhiliao -c "TRUNCATE zl_chunk;"
    ```
+   注：`<user>` 需按实际部署确认，两个候选值：docker/local-dev.yml 中 `POSTGRES_USER: zhiliao`，application.yaml 中 `username: peijiarui`。
 
 2. drop Milvus collection（旧向量全部失效）。临时开放 HTTP 端口：
    ```bash
    # 编辑 docker/local-dev.yml，取消 zhiliao-milvus 9091 端口映射注释，然后：
-   docker compose -f docker/local-dev.yml up -d zhiliao-milvus
+   docker compose -f docker/local-dev.yml up -d milvus
    curl -X POST http://localhost:9091/v2/vectordb/collections/drop \
         -H 'Content-Type: application/json' \
         -d '{"collectionName": "zhiliao_chunks"}'
    # 恢复 9091 注释后再次 up -d（可选）
    ```
+   注：compose 服务名为 `milvus`（容器名 zhiliao-milvus），up 命令须用服务名。
    collection 由 langchain4j starter 在应用下次写入时自动重建。
 
 3. 全量重新处理（重新解析、切分、embedding，metadata 带 kbId）：
