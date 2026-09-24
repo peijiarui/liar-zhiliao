@@ -30,6 +30,9 @@ import java.nio.charset.StandardCharsets;
 
 import org.springframework.util.DigestUtils;
 
+import static org.liar.zhiliao.common.constants.CommonConstants.COMPANY_ID;
+import static org.liar.zhiliao.common.constants.CommonConstants.COMPANY_KB_ID;
+
 /**
  * @author liar
  * @since 11/07/26
@@ -59,7 +62,7 @@ public class KnowledgeRetrievalTool {
         boolean admin = principal.isAdmin();
         List<Long> visibleKbIds = admin
                 ? List.of()
-                : chunkRepository.findVisibleKbIds(principal.deptId());
+                : chunkRepository.findVisibleKbIds(COMPANY_ID, principal.deptId());
         if (!admin && visibleKbIds.isEmpty()) {
             log.info("User {} has no visible knowledge bases, return empty", principal.userId());
             return "";

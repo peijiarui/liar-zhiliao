@@ -199,7 +199,7 @@ matches = matches.stream().filter(m -> m.score() >= request.minScore()).toList()
 | # | 风险 | 验证/应对 |
 |---|------|-----------|
 | 1 | ~~Milvus 版本需 ≥ 2.5.4（`partitionkey.isolation` 的起点）~~ | **已解决（2026-09-22 实测）**：本机运行的是 `milvus-standalone` / `milvusdb/milvus:v2.6.18`，≥ 2.5.4，隔离特性可用。注意本机容器由手工 `docker run` 启动，与仓库 `docker/local-dev.yml`（`zhiliao-*` 命名、`latest` tag）**不对应**，故不修改该文件 |
-| 2 | isolation 开启后对多值 `kb_id in [...]` 的行为（文档要求"应只含单值"方能利用隔离） | 实测；若报错则移除 isolation 属性退化为普通分区裁剪，并在本 spec 记录降级 |
+| 2 | ~~isolation 开启后对多值 `kb_id in [...]` 的行为~~ | **已降级（2026-09-23 实测）**：报错点在 admin 全量检索（`kbIds=null` 无 expr）——`partitionkey.isolation=true` 强制所有 search 的 expr 必须含分区键，按 id 的 delete 同理被拒。执行预案：移除 isolation 属性，退化为普通分区裁剪；已有 collection 需 drop 重建（见 rebuild-vectors.md），启动期校验对遗留 isolation=true 直接拦截 |
 | 3 | 分区键字段是否自动建索引 | `describeCollection` 确认；若无索引且过滤报错，则显式 `createIndex(kb_id)` |
 | 4 | `id in [...]` 删除在分区键集合 + `EVENTUALLY` 下是否可用 | 实测；失败则将 store 的 consistency 提升为 `BOUNDED`，并评估读延迟影响 |
 | 5 | FLAT → HNSW 由精确检索变为近似检索，`minScore` 命中率可能变化 | 新旧 collection 跑同一批查询对比命中率与分数，确认 `(cos+1)/2` 换算正确、召回可接受 |

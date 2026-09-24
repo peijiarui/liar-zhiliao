@@ -28,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.liar.zhiliao.common.constants.CommonConstants.COMPANY_ID;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -83,7 +84,7 @@ class KnowledgeRetrievalToolTest {
     void shouldDenyRetrievalWhenNoVisibleKb() {
         when(chunkRepository.findPrincipalByMemoryId("conv-1"))
                 .thenReturn(new RetrievalPrincipal(1L, "USER", 2L));
-        when(chunkRepository.findVisibleKbIds(2L)).thenReturn(List.of());
+        when(chunkRepository.findVisibleKbIds(COMPANY_ID, 2L)).thenReturn(List.of());
 
         String result = tool.retrieveKnowledge("conv-1", "请假流程");
 
@@ -96,7 +97,7 @@ class KnowledgeRetrievalToolTest {
         stubHappyPath();
         when(chunkRepository.findPrincipalByMemoryId("conv-1"))
                 .thenReturn(new RetrievalPrincipal(1L, "USER", 2L));
-        when(chunkRepository.findVisibleKbIds(2L)).thenReturn(List.of(1L, 3L));
+        when(chunkRepository.findVisibleKbIds(COMPANY_ID, 2L)).thenReturn(List.of(1L, 3L));
 
         tool.retrieveKnowledge("conv-1", "请假流程");
 
@@ -132,7 +133,7 @@ class KnowledgeRetrievalToolTest {
         stubHappyPath();
         when(chunkRepository.findPrincipalByMemoryId("conv-1"))
                 .thenReturn(new RetrievalPrincipal(1L, "USER", 2L));
-        when(chunkRepository.findVisibleKbIds(2L)).thenReturn(List.of(7L));
+        when(chunkRepository.findVisibleKbIds(COMPANY_ID, 2L)).thenReturn(List.of(7L));
 
         tool.retrieveKnowledge("conv-1", "请假流程");
 
@@ -144,7 +145,7 @@ class KnowledgeRetrievalToolTest {
     void cachedRetrievalShouldBypassSearch() {
         when(chunkRepository.findPrincipalByMemoryId("conv-1"))
                 .thenReturn(new RetrievalPrincipal(1L, "USER", 2L));
-        when(chunkRepository.findVisibleKbIds(2L)).thenReturn(List.of(1L));
+        when(chunkRepository.findVisibleKbIds(COMPANY_ID, 2L)).thenReturn(List.of(1L));
         when(retrievalCacheService.getCachedRetrieval(anyString(), eq("2")))
                 .thenReturn(List.of(new RankedChunk(11L, "内容", null, 0.9)));
 

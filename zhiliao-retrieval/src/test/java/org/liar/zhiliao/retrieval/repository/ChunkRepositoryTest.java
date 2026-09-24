@@ -48,9 +48,9 @@ class ChunkRepositoryTest {
 
     @Test
     void findVisibleKbIdsShouldReturnKbIds() {
-        when(jdbcTemplate.queryForList(anyString(), eq(Long.class), eq(2L)))
+        when(jdbcTemplate.queryForList(anyString(), eq(Long.class), eq(0L), eq(2L)))
                 .thenReturn(List.of(1L, 3L));
 
-        assertEquals(List.of(1L, 3L), repository.findVisibleKbIds(2L));
+        assertEquals(List.of(1L, 3L), repository.findVisibleKbIds(0L, 2L));
     }
 }

@@ -30,6 +30,7 @@ class MilvusCollectionManager {
 
     private static final int ID_MAX_LENGTH = 36;
     private static final int TEXT_MAX_LENGTH = 65535;
+    /** 已移除的建表属性：isolation=true 时服务端强制 search/delete 的 expr 必须含分区键，与 admin 全量检索冲突；仅用于检测旧 collection 遗留 */
     private static final String ISOLATION_PROPERTY = "partitionkey.isolation";
     private static final String HNSW_EXTRA_PARAM = "{\"M\":16,\"efConstruction\":200}";
 
@@ -118,7 +119,6 @@ class MilvusCollectionManager {
                                 .withPartitionKey(true).build())
                         .build())
                 .withPartitionsNum(numPartitions)
-                .withProperty(ISOLATION_PROPERTY, "true")
                 .build();
         MilvusResponses.check(client.createCollection(request), "createCollection");
     }
@@ -138,6 +138,14 @@ class MilvusCollectionManager {
                 .withCollectionName(collectionName).build());
         MilvusResponses.check(response, "describeCollection");
         validateSchema(new DescCollResponseWrapper(response.getData()).getFields(), dimension, collectionName);
+
+        if (response.getData().getPropertiesList().stream()
+                .anyMatch(kv -> ISOLATION_PROPERTY.equals(kv.getKey())
+                        && "true".equalsIgnoreCase(kv.getValue()))) {
+            throw new IllegalStateException(mismatch(collectionName,
+                    "legacy '" + ISOLATION_PROPERTY + "'=true (it forces server-side expr to contain kb_id, "
+                            + "breaking admin unfiltered search and delete-by-id)"));
+        }
 
         if (isVectorIndexMissing()) {
             log.warn("Milvus collection {} has no index on {}; creating", collectionName, MilvusSchema.VECTOR_FIELD);

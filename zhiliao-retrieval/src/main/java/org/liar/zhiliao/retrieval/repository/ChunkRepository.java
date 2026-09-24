@@ -84,9 +84,15 @@ public class ChunkRepository {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
-    /** 部门可见的知识库 ID 集合（来自 zl_kb_dept_visibility） */
-    public List<Long> findVisibleKbIds(Long deptId) {
-        String sql = "SELECT kb_id FROM zl_kb_dept_visibility WHERE dept_id = ?";
-        return jdbcTemplate.queryForList(sql, Long.class, deptId);
+    /** 多个部门可见的知识库 ID 集合（来自 zl_kb_dept_visibility，dept_id IN 过滤） */
+    public List<Long> findVisibleKbIds(Long... deptIds) {
+        if (deptIds == null || deptIds.length == 0) {
+            return List.of();
+        }
+        String placeholders = String.join(",", Collections.nCopies(deptIds.length, "?"));
+        String sql = "SELECT distinct kb_id FROM zl_kb_dept_visibility WHERE dept_id IN (%s)"
+                .formatted(placeholders);
+        // Long[] 直接作为 Object[] varargs 传递，与 IN 占位符数量一致；强转 (Object) 会把数组折叠成单个参数
+        return jdbcTemplate.queryForList(sql, Long.class, deptIds);
     }
 }

@@ -29,6 +29,10 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     public void create(ZlKnowledgeBase kb) {
+        // DB 列默认值为 1，MP insert 会忽略 null 字段；未选部门时按约定落到 0（全公司）
+        if (kb.getDeptId() == null) {
+            kb.setDeptId(0L);
+        }
         knowledgeBaseMapper.insert(kb);
     }
 

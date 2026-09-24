@@ -18,12 +18,13 @@
 | MinIO | `minio` | `minio/minio:RELEASE.2025-09-07T16-13-09Z` | 9000 |
 | attu（Milvus 控制台） | `attu` | `zilliz/attu:v3.0.0-beta.6` | 见 `docker port attu` |
 
-**Milvus v2.6.18 ≥ 2.5.4**，`partitionkey.isolation` 可用，无需升级镜像。
+**Milvus v2.6.18**，无需升级镜像。建表已移除 `partitionkey.isolation`（2026-09-23：该属性令服务端强制 search/delete 的 expr 必须含分区键，与 admin 全量检索和按 id 删除冲突），旧 collection 若仍带该属性，启动期校验直接拦截。
 
 ## 顺序要求
 
 新版**启动期会校验 schema，不符即拒绝启动**（不自动 drop）。因此 drop 必须发生在启动之前。
-未执行 drop 时启动会报 `Milvus collection schema mismatch: missing field 'kb_id'`。
+未执行 drop 时启动会报 `Milvus collection schema mismatch: missing field 'kb_id'`；
+若字段相同但旧 collection 仍带 `partitionkey.isolation=true`，则报 `schema mismatch: legacy 'partitionkey.isolation'...`。
 
 ## 步骤
 
@@ -48,7 +49,7 @@
 3. 保留 `zl_document` 行与 MinIO 对象不变。
 
 4. 部署新版并启动。collection 由 `zhiliao-vector` 在**启动期**自动创建
-   （64 分区 + HNSW/COSINE + `partitionkey.isolation=true`）。
+   （64 分区 + HNSW/COSINE）。
    应用日志应出现 `Milvus collection zhiliao_chunks created` 与 `Milvus store ready`。
 
 5. 全量重新处理（重新解析、切分、embedding，`kb_id` 作为独立字段写入）：
